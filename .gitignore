@@ -1,0 +1,12 @@
+
+# MATLAB files
+*.doc*
+*.doc
+*.xls*
+*.xls
+
+# Development files
+*_devel*
+*.db
+*.log
+*.bak
