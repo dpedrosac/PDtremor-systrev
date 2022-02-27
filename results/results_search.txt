@@ -1,0 +1,48 @@
+Data to work with is current_analysis (backup: ./sources/samsam.enl)
+
+PSYCInfo 			:		1336
+Embase			:		5823
+MEDLINE			:		4119
+pre1987			:		 574
+duplicates			: 		3385
+removed after discussion:		  31
+excluced after abstract	:		7540
+full-text search		:	322
+excluced after full-text:	204
+	reviews		:	 59
+	no tremor outc.	:	 58
+	few participants	: 	 20
+	not found		:	 23
+	case reports	:	 11	
+	wrong interv.	:	  9
+	no intervention 	:	 15
+	duplicates		:	  6
+	wrong population	:	  1
+	other			:	  4
+
+processed:	116
+
+
+comments1: cochrane reviews* screened with 188 results:
+
+studies			: 			 188
+excluced after full-text:	 
+	pre1987		:	  19
+	reviews:		   5
+	no tremor outc.	:	  87
+	Poster/Abstarct	: 	  39
+	not found	:	  26
+	personal comm.	:	   3	
+	duplicates	:	   2
+processed: 7
+
+
+comments: PSG2005(Rascol et al. 2005) and parts of Lew et al. was discarded as duplicates, as information was present in Elmer et al. 2013
+
+Reviews:
+Stowe RL, Ives NJ, Clarke C, van Hilten J, Ferreira J, Hawker RJ, Shah L, Wheatley K, Gray R. Dopamine agonist therapy in early Parkinson's disease. Cochrane Database Syst Rev. 2008 Apr 16;(2):CD006564. doi: 10.1002/14651858.CD006564.pub2. PMID: 18425954.
+
+Caslake R, Macleod A, Ives N, Stowe R, Counsell C. Monoamine oxidase B inhibitors versus other dopaminergic agents in early Parkinson's disease. Cochrane Database Syst Rev. 2009 Oct 7;(4):CD006661. doi: 10.1002/14651858.CD006661.pub2. PMID: 19821381.
+
+Stowe R, Ives N, Clarke CE, Deane K; van Hilten, Wheatley K, Gray R, Handley K, Furmston A. Evaluation of the efficacy and safety of adjuvant treatment to levodopa therapy in Parkinson s disease patients with motor complications. Cochrane Database Syst Rev. 2010 Jul 7;(7):CD007166. doi: 10.1002/14651858.CD007166.pub2. PMID: 20614454. 
+
