@@ -2,11 +2,16 @@
 # MATLAB files
 *.doc*
 *.doc
-*.xls*
-*.xls
+*.ris
+*.xml
 
 # Development files
 *_devel*
 *.db
 *.log
 *.bak
+*.sav
+
+sources/
+software/
+pdf/
