@@ -1,9 +1,7 @@
 
-# MATLAB files
-*.doc*
-*.doc
-*.ris
-*.xml
+# Endnote files
+*.enl
+?.Data/
 
 # Development files
 *_devel*
@@ -12,6 +10,9 @@
 *.bak
 *.sav
 
+# Folders not to be included
 sources/
 software/
 pdf/
+alte_dateien/
+included_references.Data/
