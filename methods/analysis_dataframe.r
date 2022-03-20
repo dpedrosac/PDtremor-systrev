@@ -1,7 +1,7 @@
 # This is code to analse the data collected for the systematic literature review
 # Code developed by David Pedrosa
 
-# Version 1.2 # 2022-02-08, first analyses with metafor package to obtain results
+# Version 1.3 # 2022-03-19, added analyses for QES
 
 # ==================================================================================================
 ## Specify packages of interest and load them automatically if needed
@@ -134,7 +134,7 @@ total %>% write.xlsx("synopsis.PDtremorSystematicReview.xlsx", sheetName = "Syno
 
 
 # ==================================================================================================
-### PART II: EXTRACTION OF PRIMARY AND SECONDARY OUTCOMES FROM WOKSHEETS
+### PART II: EXTRACTION OF PRIMARY AND SECONDARY OUTCOMES FROM WORKSHEETS
 # ==================================================================================================
 # Extract primary outcomes
 extracted_outcomes_p 	<- lapply(tab_names, function(x) read_excel(results_file, 
@@ -154,6 +154,10 @@ for (i in unique(all_outcomes_p$ID)) {
 
 outcomes_wideRCTprim <- outcomes_wide_p[which(outcomes_wide_p$study_type=="Randomised-controlled trial (RCT)"),]
 outcomes_wideRCTprim %>% write.xlsx("primary_outcomesRCT.xlsx", sheetName = "RCT", 
+  col.names = TRUE, row.names = TRUE, append = FALSE, overwrite=TRUE) # This part merely serves to identify studies with insufficient/wrong aligned information
+
+outcomes_wideQESprim <- outcomes_wide_p[which(outcomes_wide_p$study_type=="Quasi-experimental study"),]
+outcomes_wideQESprim %>% write.xlsx("primary_outcomesQES.xlsx", sheetName = "QES", 
   col.names = TRUE, row.names = TRUE, append = FALSE, overwrite=TRUE) # This part merely serves to identify studies with insufficient/wrong aligned information
 
 # Extract secondary outcomes
@@ -178,12 +182,18 @@ outcomes_wideRCTsec <- outcomes_wide_s %>% filter(study_type %in% "Randomised-co
 outcomes_wideRCTsec %>% write.xlsx("secondary_outcomesRCT.xlsx", sheetName = "RCT", 
   col.names = TRUE, row.names = TRUE, append = FALSE, overwrite=TRUE) # This part merely serves to identify studies with insufficient/wrong aligned information
 
+outcomes_wideQESsec <- outcomes_wide_s %>% filter(study_type %in% "Quasi-experimental study") %>% filter(author %in% selection)
+
+outcomes_wideQESsec %>% write.xlsx("secondary_outcomesQES.xlsx", sheetName = "RCT", 
+  col.names = TRUE, row.names = TRUE, append = FALSE, overwrite=TRUE) # This part merely serves to identify studies with insufficient/wrong aligned information
+
+
 # ==================================================================================================
 ### PART III: CATEGORIZE AVAILABLE DATA INTO SIMILAR GROUPS AND SYNTHESIZE WITH EFFECT SIZES
 # ==================================================================================================
 
-# 1. Extract all relevant primary and secondary outcomes with baseline and follow-up values (blfu)
-# B. Primary outcomes	
+# 1. Extract all relevant primary and secondary outcomes from RCTs with baseline and follow-up values (blfu)
+# A. Primary outcomes	
 outcomes_rct.blfu.prim 		<- outcomes_wide_p %>% # somehow bulky way that MUST be simplified somehow using e.g., a lapply function 
 								rownames_to_column("type") %>%
 								filter(study_type=="Randomised-controlled trial (RCT)") %>%
@@ -195,8 +205,9 @@ data_temp2 					<- outcomes_rct.blfu.prim %>%
 outcomes_rct.blfu.prim 		<- cbind(data_temp1, data_temp2)
 
 tibble_rct.blfu.prim 		<- lapply(tab_names[as.numeric(outcomes_rct.blfu.prim$type)], function(x) read_excel(results_file, 
-															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high'), range = "C37:H44"))
+															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high', 'pvalue', 'baseline_sd'), range = "C37:J44"))
 primary_outcomes.blfu 		<- data.frame(data.table::rbindlist(tibble_rct.blfu.prim, idcol='ID')) # merges everything to one dataframe
+
 
 # B. Secondary outcomes
 outcomes_rct.blfu.sec 		<- outcomes_wide_s %>% # somehow bulky way that MUST be simplified somehow using e.g., a lapply function 
@@ -211,16 +222,56 @@ outcomes_rct.blfu.sec 		<- cbind(data_temp1, data_temp2)
 
 
 tibble_rct.blfu.sec 		<- lapply(tab_names[as.numeric(outcomes_rct.blfu.sec$type)], function(x) read_excel(results_file, 
-															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high'), range = "C45:H64"))
+															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high', 'pvalue', 'baseline_sd'), range = "C45:J64"))
 secondary_outcomes.blfu 	<- data.frame(data.table::rbindlist(tibble_rct.blfu.sec, idcol='ID')) %>% drop_na(outcome) # merges everything to one dataframe
 
 # Merge results for baseline + follow-up data (blfu)
 tibble_rct.blfu 			<- list(tibble_rct.blfu.prim, tibble_rct.blfu.sec) 		# facilitates data handling in a loop later
-outcomes_all.blfu 			<- list(primary_outcomes.blfu, secondary_outcomes.blfu) # facilitates data handling in a loop later ## NOT USED, REMOVE?
+outcomes_rct.all.blfu 		<- list(primary_outcomes.blfu, secondary_outcomes.blfu) # facilitates data handling in a loop later ## NOT USED, REMOVE?
 outcomes_rct.blfu 			<- list(outcomes_rct.blfu.prim, outcomes_rct.blfu.sec)
 
 # ==================================================================================================
-# 2. Extract relevant primary and secondary outcomes with results as mean-difference (md)
+# 2. Extract all relevant primary and secondary outcomes from QES with baseline and follow-up values (blfu)
+# A. Primary outcomes	
+
+outcomes_qes.blfu.prim 		<- outcomes_wide_p %>% # somehow bulky way that MUST be simplified somehow using e.g., a lapply function 
+								rownames_to_column("type") %>%
+								filter(study_type=="Quasi-experimental study") %>%
+								filter(across(primary_outcome1, ~ grepl('baseline|follow-up', .)))
+	
+data_temp1 					<- outcomes_qes.blfu.prim %>% select(!contains("outcome"))
+data_temp2 					<- outcomes_qes.blfu.prim %>% 	
+								select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
+outcomes_qes.blfu.prim 		<- cbind(data_temp1, data_temp2)
+
+tibble_qes.blfu.prim 		<- lapply(tab_names[as.numeric(outcomes_qes.blfu.prim$type)], function(x) read_excel(results_file, 
+															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high', 'pvalue', 'baseline_sd'), range = "C37:J44"))
+primary_outcomes.blfu 		<- data.frame(data.table::rbindlist(tibble_qes.blfu.prim, idcol='ID')) # merges everything to one dataframe
+
+
+# B. Secondary outcomes
+outcomes_qes.blfu.sec 		<- outcomes_wide_s %>% # somehow bulky way that MUST be simplified somehow using e.g., a lapply function 
+								rownames_to_column("type") %>%
+								filter(study_type=="Quasi-experimental study") %>%
+								filter(across(secondary_outcome1, ~ grepl('baseline|follow-up', .)))
+	
+data_temp1 					<- outcomes_qes.blfu.sec %>% select(!contains("outcome"))
+data_temp2 					<- outcomes_qes.blfu.sec %>% 	
+								select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
+outcomes_qes.blfu.sec 		<- cbind(data_temp1, data_temp2)
+
+
+tibble_qes.blfu.sec 		<- lapply(tab_names[as.numeric(outcomes_qes.blfu.sec$type)], function(x) read_excel(results_file, 
+															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high', 'pvalue', 'baseline_sd'), range = "C45:J64"))
+secondary_outcomes.blfu 	<- data.frame(data.table::rbindlist(tibble_qes.blfu.sec, idcol='ID')) %>% drop_na(outcome) # merges everything to one dataframe
+
+# Merge results for baseline + follow-up data (blfu)
+tibble_qes.blfu 			<- list(tibble_qes.blfu.prim, tibble_qes.blfu.sec) 		# facilitates data handling in a loop later
+outcomes_qes.all.blfu 		<- list(primary_outcomes.blfu, secondary_outcomes.blfu) # facilitates data handling in a loop later ## NOT USED, REMOVE?
+outcomes_qes.blfu 			<- list(outcomes_qes.blfu.prim, outcomes_qes.blfu.sec)
+
+# ==================================================================================================
+# 3. Extract relevant primary and secondary outcomes from RCTs with results as mean-difference (md)
 # A. Primary outcomes
 outcomes_rct.md.prim 		<- outcomes_wide_p %>% # somehow bulky way that MUST be simplified somehow using e.g., a lapply function 
 								rownames_to_column("type") %>%
@@ -233,7 +284,7 @@ data_temp2 					<- outcomes_rct.md.prim %>%
 outcomes_rct.md.prim 		<- cbind(data_temp1, data_temp2)
 
 tibble_rct.md.prim 			<- lapply(tab_names[as.numeric(outcomes_rct.md.prim$type)], function(x) read_excel(results_file, 
-															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high'), range = "C37:H44"))
+															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high', 'pvalue', 'baseline_sd'), range = "C37:J44"))
 primary_outcomes.md 		<- data.frame(data.table::rbindlist(tibble_rct.md.prim, idcol='ID')) # merges everything to one dataframe
 
 # B. Secondary outcomes
@@ -248,7 +299,7 @@ data_temp2 					<- outcomes_rct.md.sec %>%
 outcomes_rct.md.sec 		<- cbind(data_temp1, data_temp2)
 
 tibble_rct.md.sec 			<- lapply(tab_names[as.numeric(outcomes_rct.md.sec$type)], function(x) read_excel(results_file, 
-															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high'), range = "C45:H64"))
+															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high', 'pvalue', 'baseline_sd'), range = "C45:J64"))
 secondary_outcomes.md 		<- data.frame(data.table::rbindlist(tibble_rct.md.sec, idcol='ID')) # merges everything to one dataframe
 
 # Merge results for mean-difference data (md)
@@ -256,20 +307,55 @@ tibble_rct.md 				<- list(tibble_rct.md.prim, tibble_rct.md.sec) 		# facilitates
 outcomes_all.md 			<- list(primary_outcomes.md, secondary_outcomes.md) # facilitates data handling in a loop later ## NOT USED, REMOVE?
 outcomes_rct.md 			<- list(outcomes_rct.md.prim, outcomes_rct.md.sec)
 
+# ==================================================================================================
+# 4. Extract relevant primary and secondary outcomes from QES with results as mean-difference (md)
+# A. Primary outcomes
+outcomes_qes.md.prim 		<- outcomes_wide_p %>% # somehow bulky way that MUST be simplified somehow using e.g., a lapply function 
+								rownames_to_column("type") %>%
+								filter(study_type=="Quasi-experimental study" ) %>%
+								filter(if_any(everything(), ~ grepl("mean-difference", .)))
+
+data_temp1 					<- outcomes_qes.md.prim %>% select(!contains("outcome"))
+data_temp2 					<- outcomes_qes.md.prim %>% 	
+								select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
+outcomes_qes.md.prim 		<- cbind(data_temp1, data_temp2)
+
+tibble_qes.md.prim 			<- lapply(tab_names[as.numeric(outcomes_qes.md.prim$type)], function(x) read_excel(results_file, 
+															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high', 'pvalue', 'baseline_sd'), range = "C37:J44"))
+primary_outcomes.md 		<- data.frame(data.table::rbindlist(tibble_qes.md.prim, idcol='ID')) # merges everything to one dataframe
+
+# B. Secondary outcomes
+outcomes_qes.md.sec 		<- outcomes_wide_s %>% # somehow bulky way that MUST be simplified somehow using e.g., a lapply function 
+								rownames_to_column("type") %>%
+								filter(study_type=="Quasi-experimental study" ) %>%
+								filter(if_any(everything(), ~ grepl("mean-difference", .)))
+
+data_temp1 					<- outcomes_qes.md.sec %>% select(!contains("outcome"))
+data_temp2 					<- outcomes_qes.md.sec %>% 	
+								select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
+outcomes_qes.md.sec 		<- cbind(data_temp1, data_temp2)
+
+tibble_qes.md.sec 			<- lapply(tab_names[as.numeric(outcomes_qes.md.sec$type)], function(x) read_excel(results_file, 
+															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high', 'pvalue', 'baseline_sd'), range = "C45:J64"))
+secondary_outcomes.md 		<- data.frame(data.table::rbindlist(tibble_qes.md.sec, idcol='ID')) # merges everything to one dataframe
+
+# Merge results for mean-difference data (md)
+tibble_rct.md 				<- list(tibble_qes.md.prim, tibble_qes.md.sec) 		# facilitates data handling in a loop later
+outcomes_all.md 			<- list(primary_outcomes.md, secondary_outcomes.md) # facilitates data handling in a loop later ## NOT USED, REMOVE?
+outcomes_qes.md 			<- list(outcomes_qes.md.prim, outcomes_qes.md.sec)
+
 
 # ==================================================================================================
-# A. Extract SMD of studies with baseline and follow-up data via loop
+# A. Extract SMD of RCTs with baseline and follow-up data via loop
 # General settings
 category_condition 	<- c("baseline", "follow-up")
-
 categories 			<- c("levodopa", "dopamine agonists", "mao-inhibitors", "amantadin", "physical exercise", "other") 	# categories to be used as subgroups
-
 
 studies2exclude 	<- c(outcomes_rct.md.prim$author, outcomes_rct.md.sec$author, "Bara-Jimenez et al. 2003", # list of studies that need manual checks 																				# these are the studies that are problematic for some reason
 					"Bergamasco et al. 2000", "Eberhardt et al. 1990", "Heinonen et al. 1989", "King et al. 2009", "Nomoto et al. 2018", "Olanow et al. 1987", 
-					"Tortolero et al. 2004", "Kadkhodaie et al. 2019", "Macht et al. 2000",
-					"Navan et al. 2003.1", "Navan et al. 2003", "Nutt et al. 2007", "Olson et al. 1997",
-					"Sivertsen et al. 1989", "Spieker et al. 1999")
+					"Tortolero et al. 2004", "Kadkhodaie et al. 2019", "Macht et al. 2000", # "Navan et al. 2003.1", "Navan et al. 2003",
+					"Nutt et al. 2007", #"Olson et al. 1997",
+					"Sivertsen et al. 1989") #, "Spieker et al. 1999")
 
 # Formula used in the next loop 
 df_transpose <- function(df) { # function intended to transpose a matrix
@@ -289,7 +375,6 @@ writeLines(sprintf("%s", strrep("=",40)))
 writeLines("\nExtracting results from pre-post controlled RCT studies (primary AND secondary outcomes):")
 
 for (o in 1:2){ # loop through primary and secondary outcomes
-
 	outcomes_to_test 	<- data.frame(outcomes_rct.blfu[o])
 	idx_studies2exclude <- which(outcomes_rct.blfu[[o]]$author %in% studies2exclude, arr.ind=TRUE)
 
@@ -379,13 +464,12 @@ for (o in 1:2){ # loop through primary and secondary outcomes
 cat("\n...Done!")
 writeLines(sprintf("\n%s", strrep("=",40)))
 
+# ==================================================================================================
+# B. Extract data from RCT with mean-differences
 
-## B. Extract data from RCT with mean-differences
+#TODO uincorporate that baseline sd is used to standardize!
 
-#TODO create a generic function für primary and secondary outcomes via loop; Data must be concatenated before
-# Start extracting data:
-
-studies2exclude 	<- c("Postuma et al. 2012")#"Spieker et al. 1999")
+studies2exclude 	<- c("Postuma et al. 2012")
 
 # Formula used in the next loop 
 df_transpose <- function(df) { # function intended to transpose a matrix
@@ -480,6 +564,131 @@ for (o in 1:2){ # loop through primary and secondary outcomes
 	}
 }
 
+# Add manually: Ziegler et al. 2003 (p-values available with t-test), Friedman et al. 1997 (ask Goetz for baseline data), Jankovic et al. 2014 (statistical help with ANCOVA),
+# Malsch et al. 2001 (baseline_sd available), Nomoto et al. 2018 (p-values available with t-test)
+
+# ==================================================================================================
+# C. Extract SMD of QES with baseline and follow-up data via loop
+# General settings
+
+studies2exclude 	<- c(outcomes_qes.md.prim$author, outcomes_qes.md.sec$author, "Milanov (2001)",
+							"Samotus et al. 2020", "Spieker et al. 1995") #, "Bara-Jimenez et al. 2003", # list of studies that need manual checks 																				# these are the studies that are problematic for some reason
+
+# Formula used in the next loop 
+df_transpose <- function(df) { # function intended to transpose a matrix
+  df %>% 
+    tidyr::pivot_longer(-1) %>%
+    tidyr::pivot_wider(names_from = 1, values_from = value)
+}
+
+# Pre-allocate dataframes to fill later:
+df_meta_TRT.qes 		<- data.frame(matrix(, nrow = 0, ncol = 10)) 	# dataframe to fill with data, with columns according to documentation of {metafor}-package
+colnames(df_meta_TRT.qes) 	<- c("study", "source", "comparator", "m_pre", "m_post", "sd_pre", "sd_post", "ni", "ri", "type")
+df_doublecheck 			<- df_meta_TRT.qes 									# list to be filled while looping over results
+
+# Start extracting data:
+writeLines(sprintf("%s", strrep("=",40)))
+writeLines("\nExtracting results from pre-post QES studies (primary AND secondary outcomes):")
+
+for (o in 1:2){ # loop through primary and secondary outcomes
+	outcomes_to_test 	<- data.frame(outcomes_qes.blfu[o])
+	idx_studies2exclude <- which(outcomes_qes.blfu[[o]]$author %in% studies2exclude, arr.ind=TRUE)
+
+	for (i in setdiff( 1:dim(outcomes_to_test)[1], idx_studies2exclude)){ # loop through all available studies and fill df_meta
+		writeLines(sprintf("Processing study: %s", outcomes_to_test$author[i]))
+
+		tibble_temp = tibble_qes.blfu[[o]]										# dataframe of either primary or secondary outcomes
+		idx_study_total 	<- as.numeric(outcomes_to_test$type[i]) 		# index of patient in the entire list (cf. {first_authors} above)
+		df_temp 			<- data.frame(matrix(, nrow = 1, ncol = 10))	# temporary dataframe
+		colnames(df_temp) 	<- c("study", "source", "comparator", "m_pre", "m_post", "sd_pre", "sd_post", "ni", "ri", "type")
+
+		results_temp 		<- tibble_temp[[i]] 							# the results of the outcomes
+		outcome_temp		<- outcomes_to_test %>% 						# 
+			select(matches("outcome")) %>% 
+			slice(i) %>% t()
+		colnames(outcome_temp) <- "outcome"
+
+		data_of_interest 	<- data.frame(outcome_temp) %>% 		# all outcomes should be sorted as *outcome*__*comparator*_time, e.g. 'UPDRS_item20_21__pramipexole_baseline'
+			filter_all(any_vars(!is.na(.))) %>% 							# the next few lines are intended to get some details to work with
+			separate(outcome, into=c("name_outcome", "comparator_time"), sep="__", fill = "right", remove = FALSE) %>%
+			select(name_outcome, comparator_time) %>%
+			separate(comparator_time, into=c("comparator", "time"), sep="_", fill = "right", remove = FALSE) %>%
+			select(name_outcome, comparator, time) %>%
+			filter(across(name_outcome, ~ !grepl('adverse', .)))
+		available_interventions <- unique(data_of_interest$comparator)  	# lists the available interventions to loop through
+		
+		df_temp$study = i													# Fill temporary dataframe {df_temp} (cf. line 271) with content
+		df_temp$source <- outcomes_to_test$author[i]
+		extracted_demographics 	<- lapply(tab_names[as.numeric(outcomes_to_test$type[i])], function(x) read_excel(results_file, 
+												sheet = x, col_names=c("description", paste0('arm', c(1:6))), range = "C20:I31")) # extracts demographics for all interventions
+		df_numbers 				<- df_transpose(extracted_demographics[[1]])
+		colnames(df_numbers)	<- c('arms', 'intervention', 'eligible', 'enrolled', 'included', 'excluded', 'female_perc', 'age_mean', 'age_sd', 'age_mdn', 'hy', 'updrs_mean', 'updrs_sd')
+		
+		if (length(available_interventions) == 1) {
+			
+			df_temp$type 		<- 'QES'
+			columns_of_interest <- data.frame(outcome_temp) %>% filter(rowSums(across(everything(), ~grepl(available_interventions[1], .x))) > 0)
+			df_temp$comparator 	<- available_interventions
+			idx_numbers 		<- which(df_numbers$intervention==df_temp$comparator) 					# column in which data is saved
+			if (identical(idx_numbers, integer(0))){ idx_numbers <- which(df_numbers$intervention=='total')} 	# when there are no 'arms' all data should be listed as 'total'
+		
+			# BASELINE
+			temp_vals 			<- results_temp %>% filter(rowSums(across(everything(), ~grepl(paste0(df_temp$comparator, '_', category_condition[1]), .x))) > 0)
+			df_temp$m_pre 		<- as.numeric(temp_vals$mean)
+			df_temp$sd_pre 		<- as.numeric(temp_vals$sd)
+			df_temp$ni 			<- as.numeric(df_numbers$included[idx_numbers])
+
+			# FOLLOW-UP
+			temp_vals 			<- results_temp %>% filter(rowSums(across(everything(), ~grepl(paste0(df_temp$comparator, '_', category_condition[2]), .x))) > 0)
+			df_temp$m_post 		<- as.numeric(temp_vals$mean)
+			df_temp$sd_post 	<- as.numeric(temp_vals$sd)
+			df_temp$ni 			<- as.numeric(df_numbers$included[idx_numbers])			
+			
+			df_meta_TRT.qes 	<- rbind(df_meta_TRT.qes, df_temp)
+		} else if (length(available_interventions)>1) {
+			sprintf("Not yet defined, please use i = %s fo debugging", i)
+			next 
+			# loop through  possible combinations of interventions (cf. combn) and append available data
+			all_effects 			<- combn(available_interventions, 2) # list of possible effects resulting from available interventions (cf. available_interventions)
+			#extracted_demographics 	<- lapply(tab_names[as.numeric(outcomes_to_test$type[i])], function(x) read_excel(results_file, 
+			#														sheet = x, col_names=c("description", paste0('arm', c(1:6))), range = "C20:I31")) # extracts demographics for all interventions
+			#df_numbers 				<- df_transpose(extracted_demographics[[1]])
+			colnames(df_numbers)	<- c('arms', 'intervention', 'eligible', 'enrolled', 'included', 'excluded', 'female_perc', 'age_mean', 'age_sd', 'age_mdn', 'hy', 'updrs_mean', 'updrs_sd')
+			df_temp_multiple 		<- df_temp 	# necessary to maintain the structure for all combinations
+			
+			for (k in 1:dim(all_effects)[2]){ 	# loop through all possible combinations, cf. all_effects <- combn(columns_of_interest$outcome, 2)
+				
+				df_temp_multiple$type 		<- 'QES'
+				columns_of_interest 		<- data.frame(outcome_temp) %>% filter(rowSums(across(everything(), ~grepl(available_interventions[1], .x))) > 0)
+				df_temp_multiple$comparator <- all_effects[,1][k]
+				idx_numbers 				<- which(df_numbers$intervention==df_temp_multiple$comparator) 					# column in which data is saved
+				if (identical(idx_numbers, integer(0))){ idx_numbers <- which(df_numbers$intervention=='total')} 	# when there are no 'arms' all data should be listed as 'total'
+			
+				# BASELINE
+				temp_vals 					<- results_temp %>% filter(rowSums(across(everything(), ~grepl(paste0(df_temp_multiple$comparator, '_', category_condition[1]), .x))) > 0)
+				df_temp_multiple$m_pre 		<- as.numeric(temp_vals$mean)
+				df_temp_multiple$sd_pre 	<- as.numeric(temp_vals$sd)
+				df_temp_multiple$ni 		<- as.numeric(df_numbers$included[idx_numbers])
+
+				# FOLLOW-UP
+				temp_vals 					<- results_temp %>% filter(rowSums(across(everything(), ~grepl(paste0(df_temp$comparator, '_', category_condition[2]), .x))) > 0)
+				df_temp_multiple$m_post 	<- as.numeric(temp_vals$mean)
+				df_temp_multiple$sd_post 	<- as.numeric(temp_vals$sd)
+				df_temp_multiple$ni 		<- as.numeric(df_numbers$included[idx_numbers])			
+				
+				df_meta_TRT.qes 			<- rbind(df_meta_TRT.qes, df_temp_multiple)
+			}
+		} else {
+			writeLines(sprintf("\t\tNot sure what the problem is with study: %s", outcomes_to_test$author[i]))
+			df_doublecheck <- rbind(df_doublecheck, df_temp)
+
+		}
+	}
+}
+cat("\n...Done!")
+writeLines(sprintf("\n%s", strrep("=",40)))
+
+
 
 # ==================================================================================================
 # ==================================================================================================
@@ -538,7 +747,7 @@ idx_outcomes_rct1 <- outcomes_wide %>% # idx_outcomes_rct1 renamed to outcomes_r
                 remove = TRUE) %>% select(-any_of("the_rest"))
 
 extracted_results1_p 	<- lapply(tab_names[as.numeric(idx_outcomes_rct1$type)], function(x) read_excel(results_file, 
-															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high'), range = "C35:H44"))
+															sheet = x, col_names=c('outcome', 'mean', 'sd', 'sem', 'ci_low', 'ci_high', 'pvalue', 'baseline_sd'), range = "C35:H44"))
 
 results_first_attempt 			<- data.frame(data.table::rbindlist(extracted_results1_p, idcol='ID')) # merges everything to one dataframe
 

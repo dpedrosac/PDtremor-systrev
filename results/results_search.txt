@@ -8,7 +8,7 @@ duplicates			: 		3385
 removed after discussion:		  31
 excluced after abstract	:		7540
 full-text search		:	322
-excluced after full-text:	204
+excluced after full-text:	215
 	reviews		:	 59
 	no tremor outc.	:	 58
 	few participants	: 	 20
@@ -18,24 +18,24 @@ excluced after full-text:	204
 	no intervention 	:	 15
 	duplicates		:	  6
 	wrong population	:	  1
+	incomplete_results:	  9
 	other			:	  4
 
-processed:	116
+processed:	107
 
 
 comments1: cochrane reviews* screened with 188 results:
 
-studies			: 			 188
+studies			: 	188
 excluced after full-text:	 
-	pre1987		:	  19
-	reviews:		   5
-	no tremor outc.	:	  87
-	Poster/Abstarct	: 	  39
-	not found	:	  26
-	personal comm.	:	   3	
-	duplicates	:	   2
+	pre1987		:	 19
+	reviews		:	  5
+	no tremor outc.	:	 87
+	Poster/Abstarct	: 	 39
+	not found		:	 26
+	personal comm.	:	  3	
+	duplicates		:	  2
 processed: 7
-
 
 comments: PSG2005(Rascol et al. 2005) and parts of Lew et al. was discarded as duplicates, as information was present in Elmer et al. 2013
 
