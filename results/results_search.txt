@@ -8,21 +8,22 @@ duplicates			: 		3385
 removed after discussion:		  31
 excluced after abstract	:		7540
 full-text search		:	322
-excluced after full-text:	215
+excluced after full-text:	216
 	reviews		:	 59
 	no tremor outc.	:	 58
 	few participants	: 	 20
-	not found		:	 23
+	not found		:	 22
 	case reports	:	 11	
 	wrong interv.	:	  9
 	no intervention 	:	 15
 	duplicates		:	  6
 	wrong population	:	  1
-	incomplete_results:	  9
+	incomplete_results:	 11
 	other			:	  4
 
-processed:	107
+processed:	106
 
+=WURZEL(($D$23*(E73+(D73-MITTELWERT(D73;D75))^2)+$D$23*(E75+(D75-MITTELWERT(D73;D75))^2))/($D$23+$D$23))
 
 comments1: cochrane reviews* screened with 188 results:
 
@@ -35,7 +36,8 @@ excluced after full-text:
 	not found		:	 26
 	personal comm.	:	  3	
 	duplicates		:	  2
-processed: 7
+	incomplete_results:	  1
+processed: 6
 
 comments: PSG2005(Rascol et al. 2005) and parts of Lew et al. was discarded as duplicates, as information was present in Elmer et al. 2013
 
