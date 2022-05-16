@@ -1,7 +1,7 @@
 # This is code to analse the data collected for the systematic literature review
 # Code developed by David Pedrosa
 
-# Version 1.3 # 2022-03-19, added analyses for QES
+# Version 1.3 # 2022-04-29, changes some minor details and re-run analyses due to added data
 
 # ==================================================================================================
 ## Specify packages of interest and load them automatically if needed
@@ -25,7 +25,7 @@ username = Sys.info()["login"]
 if (username == "dpedr") {
 wdir = "D:/Jottacloud/PDtremor_syst-review/"
 } else if (username == "david") {
-wdir = "D:/Jottacloud/PDtremor_syst-review/"
+wdir = "/media/storage/Jottacloud/PDtremor_syst-review/"
 }
 setwd(wdir)
 
@@ -351,7 +351,7 @@ outcomes_qes.md 			<- list(outcomes_qes.md.prim, outcomes_qes.md.sec)
 category_condition 	<- c("baseline", "follow-up")
 studies2exclude 	<- c(outcomes_rct.md.prim$author, outcomes_rct.md.sec$author, # these are the studies that are problematic for some reason
 					"Heinonen et al. 1989", "King et al. 2009", "Nutt et al. 2007","Sivertsen et al. 1989", 
-					"Macht et al. 2000", "Kadkhodaie et al. 2019", "Bara-Jimenez et al. 2003") # list of studies that should be likewise reported 		
+					"Macht et al. 2000", "Kadkhodaie et al. 2019") # list of studies that should be likewise reported 		
 
 # Formula used 
 df_transpose <- function(df) { # function intended to transpose a matrix
@@ -490,30 +490,6 @@ dat.rct.blfu$treatment	<- df_meta_TRT.blfu$comparator
 dat.rct.blfu$study_type	<- df_meta_TRT.blfu$type
 dat.rct.blfu$qualsyst	<- df_meta_TRT.blfu$qualsyst
 dat.rct.blfu$ni			<- df_meta_TRT.blfu$ni
-
-
-# Some studies must be added manually:
-# a. Rascol et al. 1988 (only values pre- and post available so that the former are the baseline)
-df_temp <- df_doublecheck
-df_temp$comparator <- "selegiline"
-df_temp$m_pre 	<- 1.7
-df_temp$sd_pre 	<- 0.4
-df_temp$m_post 	<- 0.9
-df_temp$sd_post <- 0.2
-df_temp$ni 		<- 16
-df_temp$qualsyst<- 16/20
-df_temp$study_type <- "RCT"
-dat_manual 		<- escalc(measure="SMCR", m1i=m_post, m2i=m_pre, sd1i=sd_pre, ni=ni, ri=1, slab=source, data=df_temp)
-df_temp  			<- dat.rct.blfu[1,]
-df_temp$slab  		<- dat_manual$source
-df_temp$yi 			<- dat_manual$yi
-df_temp$vi 			<- dat_manual$vi
-df_temp$treatment 	<- dat_manual$comparator
-df_temp$study_type  <- dat_manual$study_type
-df_temp$qualsyst 	<- dat_manual$qualsyst
-df_temp$ni 			<- 15
-
-dat.rct.blfu <- rbind(dat.rct.blfu, df_temp)
 			
 # ==================================================================================================
 # B. Extract data from RCT with mean-differences
@@ -600,7 +576,7 @@ for (o in 1:2){ # loop through primary and secondary outcomes
 						df_temp_multiple$sd_pre 	<- as.numeric(temp_vals$baseline_sd)
 						if (is.na(df_temp_multiple$sd_pre)) {
 							df_temp_multiple$sd_pre <- temp_vals$sd}
-						df_temp_multiple$sd_pre 	<- as.numeric(temp_vals$sd)
+						# df_temp_multiple$sd_pre 	<- as.numeric(temp_vals$sd)
 						df_temp_multiple$sd_post 	<- 0
 						df_temp_multiple$ni 		<- as.numeric(df_numbers$included[idx_numbers])
 											
@@ -646,7 +622,7 @@ dat.rct.md$ni			<- df_meta_TRT.md$ni
 
 
 # Some studies must be added manually:
-# b. Ziegler et al. 2003 (only p-values resulting from t-test were available)
+# a. Ziegler et al. 2003 (only p-values resulting from t-test were available)
 df_temp 		<- df_meta_TRT.md  %>% rowid_to_column() %>% filter(if_any(everything(),~str_detect(., c("Ziegler"))))
 df_temp$pvalue 	<- .088
 df_temp$tval	<- NA
@@ -662,7 +638,7 @@ dat.rct.md$vi[df_temp$rowid] <- df_temp$vi
 dat.rct.md$ni[df_temp$rowid] <- df_temp$ni
 
 
-# c. Malsch et al. 2001
+# b. Malsch et al. 2001
 df_temp 			<- dat.rct.md[1:2,]
 df_temp$slab 		<- c("Malsch et al. 2001", "Malsch et al. 2001.1")
 df_temp$treatment 	<- c("amantadine", "budipine")
@@ -690,15 +666,13 @@ dat.rct.md$ni[df_temp$rowid] <- df_temp$ni
 
 dat_results <- rbind(dat.rct.blfu, dat.rct.md)
 
-# Add manually: Friedman et al. 1997 (ask Goetz for baseline data)
-
 
 # ==================================================================================================
 # C. Extract SMD of QES with baseline and follow-up data via loop
 # General settings
 
 studies2exclude 	<- c(outcomes_qes.md.prim$author, outcomes_qes.md.sec$author,
-							"Samotus et al. 2020", "Spieker et al. 1995", "Barbagallo et al. 2018")
+							"Samotus et al. 2020", "Barbagallo et al. 2018") # "Spieker et al. 1995", 
 
 # Pre-allocate dataframes to fill later:
 df_meta_TRT.qes 		<- data.frame(matrix(, nrow = 0, ncol = 11)) 	# dataframe to fill with data, with columns according to documentation of {metafor}-package
@@ -862,7 +836,19 @@ df_temp 			<- escalc(measure="SMCR", m1i=-1.18, m2i=0, sd1i=3.2, ni=48, ri=0, sl
 
 dat.qes <- rbind(dat.qes, df_temp)
 
-# g. Samotus et al. 2020
+# h. Bara-Jimenez et al. 2003
+df_temp 			<- dat.qes[1,]
+df_temp$slab 		<- "Bara-Jimenez et al. 2003"
+df_temp$treatment 	<- "adenosineA2a"
+df_temp$study_type 	<- "QES"
+df_temp$qualsyst 	<- 14/24
+df_temp$ni			<- 12
+df_temp 			<- escalc(measure="SMCR", m1i=1.0, m2i=3.6, sd1i=1.1, ni=12, ri=0, slab=slab, data=df_temp)
+
+dat.qes <- rbind(dat.qes, df_temp)
+
+
+# h. Samotus et al. 2020
 df_temp 			<- dat.qes[1,]
 df_temp$slab 		<- "Samotus et al. 2020"
 df_temp$treatment 	<- "incobotulinumtoxin"
@@ -877,3 +863,4 @@ dat.qes 			<- dat.qes %>% drop_na()
 dat_results <- rbind(dat_results, dat.qes)
 
 dat_results %>% write.csv(file.path(wdir, "results", "results_meta-analysis.csv"), row.names = F) # save results to file
+
