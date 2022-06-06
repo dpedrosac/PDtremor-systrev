@@ -1,6 +1,6 @@
 n           = 5;                                                            % levels to use
 nos         = [1336, 5823, 4119, 3385, 7540, 31, 0];                      
-nos_man     = [0, 0, 0, 0, 19, 0, 188];                                       % numbers of manually added studies
+nos_man     = [0, 0, 0, 0, 19, 0, 189];                                       % numbers of manually added studies
 excl        = [59, 58, 20, 22, 11, 9, 15, 6, 1, 12, 0, 4];
 excl_man    = [5, 87, 0, 26, 3, 0, 0, 2, 0, 1, 39, 0];
 

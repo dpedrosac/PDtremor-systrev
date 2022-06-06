@@ -8,6 +8,17 @@
 packages = c("readxl", "dplyr", "plyr", "tibble", "tidyr", "stringr", "openxlsx", 
 				"metafor", "tidyverse") 											# packages needed
 
+# ==================================================================================================
+## In case of multiple people working on one project, this helps to create an automatic script
+username = Sys.info()["login"]
+if (username == "dpedr") {
+wdir = "D:/Jottacloud/PDtremor_syst-review/"
+} else if (username == "david") {
+wdir = "/media/storage/Jottacloud/PDtremor_syst-review/"
+}
+setwd(wdir)
+
+
 ## Load or install necessary packages
 package.check <- lapply(
   packages,
@@ -18,16 +29,6 @@ package.check <- lapply(
     }
   }
 )
-
-# ==================================================================================================
-## In case of multiple people working on one project, this helps to create an automatic script
-username = Sys.info()["login"]
-if (username == "dpedr") {
-wdir = "D:/Jottacloud/PDtremor_syst-review/"
-} else if (username == "david") {
-wdir = "/media/storage/Jottacloud/PDtremor_syst-review/"
-}
-setwd(wdir)
 
 # ==================================================================================================
 ### PART I: GENERAL DATA EXTRACTION FROM WOKSHEETS
@@ -599,7 +600,7 @@ df_meta_TRT.md <- df_meta_TRT.md %>% drop_na(m_pre, m_post)
 df_meta_TRT.md$m_pre <- df_meta_TRT.md$m_pre * (-1)
 df_meta_TRT.md$ri <- 0
 
-only_placebocontrolled = TRUE
+only_placebocontrolled = FALSE
 if (only_placebocontrolled){
 	idx_remove 			<- c()
 	idx_placebo 		<- which(df_meta_TRT.md$comparator=="placebo")								# removes placebo in the TRT group
