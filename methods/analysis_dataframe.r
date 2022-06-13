@@ -1,7 +1,7 @@
 # This is code to analse the data collected for the systematic literature review
 # Code developed by David Pedrosa
 
-# Version 1.3 # 2022-04-29, changes some minor details and re-run analyses due to added data
+# Version 1.4 # 2022-06-13, changed bug, as several functions use "select"-command. Minor changes in code
 
 # ==================================================================================================
 ## Specify packages of interest and load them automatically if needed
@@ -46,8 +46,8 @@ authors 	<- lapply(tab_names, function(x) read_excel(results_file,
 
 years 		<- lapply(tab_names, function(x) read_excel(results_file, 															
 															sheet = x, col_names=c('Abbr', 'Year'), range = "C4:D4"))
-authors_wide<- data.frame(data.table::rbindlist(authors, idcol='ID')) %>% select(Author) # data.frame(Author=sapply(Authors, "[[", 2))
-years_short <- data.frame(data.table::rbindlist(years, idcol='ID')) %>% select(Year) # data.frame(years=sapply(years, "[[", 2))
+authors_wide<- data.frame(data.table::rbindlist(authors, idcol='ID')) %>% dplyr::select(Author)
+years_short <- data.frame(data.table::rbindlist(years, idcol='ID')) %>% dplyr::select(Year)
 
 # Clean up author list so that it can be incorporated to csv table as xxx et al. 19xx/20xx
 # test regexp code here: https://regexr.com/ or https://spannbaueradam.shinyapps.io/r_regex_tester/
@@ -125,14 +125,13 @@ exclusion_short 	<- tidyr::separate(crit2, exclusion, paste0("exclusion_criterio
 total <- cbind(extracted_data1_wide, "Authors" = first_authors)
 total <- cbind(total, groups_short, intervention_short, study_type_short, aims_short, inclusion_short, exclusion_short)
 
-total <- total %>% select(Authors, Title, Journal, Year, study_design, aims, intervention1,
+total <- total %>% dplyr::select(Authors, Title, Journal, Year, study_design, aims, intervention1,
 							intervention2, intervention3, description, colnames(inclusion_short), colnames(exclusion_short))
 							
 total %>% write.csv("synopsis.PDtremorSystematicReview.csv", row.names = F)
 
 total %>% write.xlsx("synopsis.PDtremorSystematicReview.xlsx", sheetName = "Synopsis_results", 
   col.names = TRUE, row.names = FALSE, append = FALSE, overwrite=TRUE)
-
 
 # ==================================================================================================
 ### PART II: EXTRACTION OF PRIMARY AND SECONDARY OUTCOMES FROM WORKSHEETS
@@ -188,7 +187,6 @@ outcomes_wideQESsec <- outcomes_wide_s %>% filter(study_type %in% "Quasi-experim
 outcomes_wideQESsec %>% write.xlsx("secondary_outcomesQES.xlsx", sheetName = "RCT", 
   col.names = TRUE, row.names = TRUE, append = FALSE, overwrite=TRUE) # This part merely serves to identify studies with insufficient/wrong aligned information
 
-
 # ==================================================================================================
 ### PART III: CATEGORIZE AVAILABLE DATA INTO SIMILAR GROUPS AND SYNTHESIZE WITH EFFECT SIZES
 # ==================================================================================================
@@ -200,9 +198,9 @@ outcomes_rct.blfu.prim 		<- outcomes_wide_p %>% # somehow bulky way that MUST be
 								filter(study_type=="Randomised-controlled trial (RCT)") %>%
 								filter(across(primary_outcome1, ~ grepl('baseline|follow-up', .)))
 	
-data_temp1 					<- outcomes_rct.blfu.prim %>% select(!contains("outcome"))
+data_temp1 					<- outcomes_rct.blfu.prim %>% dplyr::select(!contains("outcome"))
 data_temp2 					<- outcomes_rct.blfu.prim %>% 	
-								select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
+								dplyr::select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
 outcomes_rct.blfu.prim 		<- cbind(data_temp1, data_temp2)
 
 tibble_rct.blfu.prim 		<- lapply(tab_names[as.numeric(outcomes_rct.blfu.prim$type)], function(x) read_excel(results_file, 
@@ -216,9 +214,9 @@ outcomes_rct.blfu.sec 		<- outcomes_wide_s %>% # somehow bulky way that MUST be 
 								filter(study_type=="Randomised-controlled trial (RCT)") %>%
 								filter(across(secondary_outcome1, ~ grepl('baseline|follow-up', .)))
 	
-data_temp1 					<- outcomes_rct.blfu.sec %>% select(!contains("outcome"))
+data_temp1 					<- outcomes_rct.blfu.sec %>% dplyr::select(!contains("outcome"))
 data_temp2 					<- outcomes_rct.blfu.sec %>% 	
-								select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
+								dplyr::select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
 outcomes_rct.blfu.sec 		<- cbind(data_temp1, data_temp2)
 
 
@@ -240,9 +238,9 @@ outcomes_qes.blfu.prim 		<- outcomes_wide_p %>% # somehow bulky way that MUST be
 								filter(study_type=="Quasi-experimental study") %>%
 								filter(across(primary_outcome1, ~ grepl('baseline|follow-up', .)))
 	
-data_temp1 					<- outcomes_qes.blfu.prim %>% select(!contains("outcome"))
+data_temp1 					<- outcomes_qes.blfu.prim %>% dplyr::select(!contains("outcome"))
 data_temp2 					<- outcomes_qes.blfu.prim %>% 	
-								select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
+								dplyr::select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
 outcomes_qes.blfu.prim 		<- cbind(data_temp1, data_temp2)
 
 tibble_qes.blfu.prim 		<- lapply(tab_names[as.numeric(outcomes_qes.blfu.prim$type)], function(x) read_excel(results_file, 
@@ -256,9 +254,9 @@ outcomes_qes.blfu.sec 		<- outcomes_wide_s %>% # somehow bulky way that MUST be 
 								filter(study_type=="Quasi-experimental study") %>%
 								filter(across(secondary_outcome1, ~ grepl('baseline|follow-up', .)))
 	
-data_temp1 					<- outcomes_qes.blfu.sec %>% select(!contains("outcome"))
+data_temp1 					<- outcomes_qes.blfu.sec %>% dplyr::select(!contains("outcome"))
 data_temp2 					<- outcomes_qes.blfu.sec %>% 	
-								select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
+								dplyr::select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
 outcomes_qes.blfu.sec 		<- cbind(data_temp1, data_temp2)
 
 
@@ -279,9 +277,9 @@ outcomes_rct.md.prim 		<- outcomes_wide_p %>% # somehow bulky way that MUST be s
 								filter(study_type=="Randomised-controlled trial (RCT)" ) %>%
 								filter(if_any(everything(), ~ grepl("mean-difference", .)))
 
-data_temp1 					<- outcomes_rct.md.prim %>% select(!contains("outcome"))
+data_temp1 					<- outcomes_rct.md.prim %>% dplyr::select(!contains("outcome"))
 data_temp2 					<- outcomes_rct.md.prim %>% 	
-								select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
+								dplyr::select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
 outcomes_rct.md.prim 		<- cbind(data_temp1, data_temp2)
 
 tibble_rct.md.prim 			<- lapply(tab_names[as.numeric(outcomes_rct.md.prim$type)], function(x) read_excel(results_file, 
@@ -294,9 +292,9 @@ outcomes_rct.md.sec 		<- outcomes_wide_s %>% # somehow bulky way that MUST be si
 								filter(study_type=="Randomised-controlled trial (RCT)" ) %>%
 								filter(if_any(everything(), ~ grepl("mean-difference", .)))
 
-data_temp1 					<- outcomes_rct.md.sec %>% select(!contains("outcome"))
+data_temp1 					<- outcomes_rct.md.sec %>% dplyr::select(!contains("outcome"))
 data_temp2 					<- outcomes_rct.md.sec %>% 	
-								select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
+								dplyr::select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
 outcomes_rct.md.sec 		<- cbind(data_temp1, data_temp2)
 
 tibble_rct.md.sec 			<- lapply(tab_names[as.numeric(outcomes_rct.md.sec$type)], function(x) read_excel(results_file, 
@@ -316,9 +314,9 @@ outcomes_qes.md.prim 		<- outcomes_wide_p %>% # somehow bulky way that MUST be s
 								filter(study_type=="Quasi-experimental study" ) %>%
 								filter(if_any(everything(), ~ grepl("mean-difference", .)))
 
-data_temp1 					<- outcomes_qes.md.prim %>% select(!contains("outcome"))
+data_temp1 					<- outcomes_qes.md.prim %>% dplyr::select(!contains("outcome"))
 data_temp2 					<- outcomes_qes.md.prim %>% 	
-								select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
+								dplyr::select(contains("outcome")) %>% set_names(paste0("outcome", 1:8))
 outcomes_qes.md.prim 		<- cbind(data_temp1, data_temp2)
 
 tibble_qes.md.prim 			<- lapply(tab_names[as.numeric(outcomes_qes.md.prim$type)], function(x) read_excel(results_file, 
@@ -331,9 +329,9 @@ outcomes_qes.md.sec 		<- outcomes_wide_s %>% # somehow bulky way that MUST be si
 								filter(study_type=="Quasi-experimental study" ) %>%
 								filter(if_any(everything(), ~ grepl("mean-difference", .)))
 
-data_temp1 					<- outcomes_qes.md.sec %>% select(!contains("outcome"))
+data_temp1 					<- outcomes_qes.md.sec %>% dplyr::select(!contains("outcome"))
 data_temp2 					<- outcomes_qes.md.sec %>% 	
-								select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
+								dplyr::select(contains("outcome")) %>% set_names(paste0("outcome", 1:19))
 outcomes_qes.md.sec 		<- cbind(data_temp1, data_temp2)
 
 tibble_qes.md.sec 			<- lapply(tab_names[as.numeric(outcomes_qes.md.sec$type)], function(x) read_excel(results_file, 
@@ -345,14 +343,13 @@ tibble_qes.md 				<- list(tibble_qes.md.prim, tibble_qes.md.sec) 		# facilitates
 outcomes_all.md 			<- list(primary_outcomes.md, secondary_outcomes.md) # facilitates data handling in a loop later ## NOT USED, REMOVE?
 outcomes_qes.md 			<- list(outcomes_qes.md.prim, outcomes_qes.md.sec)
 
-
 # ==================================================================================================
 # A. Extract SMD of RCTs with baseline and follow-up data via loop
 # General settings
 category_condition 	<- c("baseline", "follow-up")
 studies2exclude 	<- c(outcomes_rct.md.prim$author, outcomes_rct.md.sec$author, # these are the studies that are problematic for some reason
 					"Heinonen et al. 1989", "King et al. 2009", "Nutt et al. 2007","Sivertsen et al. 1989", 
-					"Macht et al. 2000", "Kadkhodaie et al. 2019") # list of studies that should be likewise reported 		
+					"Macht et al. 2000", "Kadkhodaie et al. 2019", "Parkinson Study Group (2007)") # list of studies that should be likewise reported 		
 
 # Formula used 
 df_transpose <- function(df) { # function intended to transpose a matrix
@@ -385,16 +382,16 @@ for (o in 1:2){ # loop through primary and secondary outcomes
 
 		results_temp 		<- tibble_temp[[i]] 							# the results of the outcomes
 		outcome_temp		<- outcomes_to_test %>% 						# 
-			select(matches("outcome")) %>% 
+			dplyr::select(matches("outcome")) %>% 
 			slice(i) %>% t()
 		colnames(outcome_temp) <- "outcome"
 
 		data_of_interest 	<- data.frame(outcome_temp) %>% 		# all outcomes should be sorted as *outcome*__*comparator*_time, e.g. 'UPDRS_item20_21__pramipexole_baseline'
 			filter_all(any_vars(!is.na(.))) %>% 							# the next few lines are intended to get some details to work with
 			separate(outcome, into=c("name_outcome", "comparator_time"), sep="__", fill = "right", remove = FALSE) %>%
-			select(name_outcome, comparator_time) %>%
+			dplyr::select(name_outcome, comparator_time) %>%
 			separate(comparator_time, into=c("comparator", "time"), sep="_", fill = "right", remove = FALSE) %>%
-			select(name_outcome, comparator, time) %>%
+			dplyr::select(name_outcome, comparator, time) %>%
 			filter(across(name_outcome, ~ !grepl('adverse', .)))
 		available_interventions <- unique(data_of_interest$comparator)  	# lists the available interventions to loop through
 		
@@ -402,7 +399,7 @@ for (o in 1:2){ # loop through primary and secondary outcomes
 		df_temp$source <- outcomes_to_test$author[i]
 		
 		if (length(available_interventions) == 1) {
-			cat(sprintf("\t\t... study: %s seems to be lacking pre-post design. Adding to manual list", outcomes_to_test$author[i]))
+			cat(sprintf("\t\t... study: %s seems to be lacking pre-post design. Adding to manual list\n", outcomes_to_test$author[i]))
 			df_doublecheck <- rbind(df_doublecheck, df_temp)
 			next
 		} else if (length(available_interventions)>1) {
@@ -478,7 +475,7 @@ if (only_placebocontrolled){
 	comparators 		<- data.frame(cbind(df_meta_TRT.blfu$comparator, df_meta_CTRL.blfu$comparator))
 	idx_nocontrol 		<- comparators %>% rowid_to_column() %>% 
 							filter(!if_any(everything(),~str_detect(., c("placebo|control")))) %>% 
-							select(rowid)															# selects where there is no placebo/control group
+							dplyr::select(rowid)															# selects where there is no placebo/control group
 	idx_remove 			<- c(idx_remove, idx_placebo, idx_nocontrol$rowid)
 	df_meta_TRT.blfu 	<- df_meta_TRT.blfu[setdiff(1:dim(df_meta_TRT.blfu)[1], idx_remove),]
 	df_meta_CTRL.blfu 	<- df_meta_CTRL.blfu[setdiff(1:dim(df_meta_CTRL.blfu)[1], idx_remove),]
@@ -495,7 +492,7 @@ dat.rct.blfu$ni			<- df_meta_TRT.blfu$ni
 # ==================================================================================================
 # B. Extract data from RCT with mean-differences
 
-studies2exclude 	<- c()
+studies2exclude 	<- c("Parkinson Study Group (2007)")
 
 # Pre-allocate dataframes to fill later:
 df_meta_TRT.md 			<- data.frame(matrix(, nrow = 0, ncol = 11)) 	# dataframe to fill with data, with columns according to documentation of {metafor}-package
@@ -520,16 +517,16 @@ for (o in 1:2){ # loop through primary and secondary outcomes
 
 		results_temp 		<- tibble_temp[[i]] 							# the results of the outcomes
 		outcome_temp		<- outcomes_to_test %>% 						# 
-			select(matches("outcome")) %>% 
+			dplyr::select(matches("outcome")) %>% 
 			slice(i) %>% t()
 		colnames(outcome_temp) <- "outcome"
 
 		data_of_interest 	<- data.frame(outcome_temp) %>% 		# all outcomes should be sorted as *outcome*__*comparator*_time, e.g. 'UPDRS_item20_21__pramipexole_baseline'
 			filter_all(any_vars(!is.na(.))) %>% 							# the next few lines are intended to get some details to work with
 			separate(outcome, into=c("name_outcome", "comparator_time"), sep="__", fill = "right", remove = FALSE) %>%
-			select(name_outcome, comparator_time) %>%
+			dplyr::select(name_outcome, comparator_time) %>%
 			separate(comparator_time, into=c("comparator", "arm"), sep="_", fill = "right", remove = FALSE) %>%
-			select(name_outcome, comparator, arm) %>%
+			dplyr::select(name_outcome, comparator, arm) %>%
 			filter(across(name_outcome, ~ !grepl('adverse', .)))
 		available_interventions <- unique(data_of_interest$comparator)  	# lists the available interventions to loop through
 			
@@ -537,7 +534,7 @@ for (o in 1:2){ # loop through primary and secondary outcomes
 		df_temp$source <- outcomes_to_test$author[i]
 
 		if (length(available_interventions) != 2) {
-				cat(sprintf("\t\t... study: %s seems to be lacking a control group. Adding to manual list", outcomes_to_test$author[i]))
+				cat(sprintf("\t\t... study: %s seems to be lacking a control group. Adding to manual list\n", outcomes_to_test$author[i]))
 				df_doublecheck.md <- rbind(df_doublecheck.md, df_temp)
 				next
 		} else { # if (length(available_interventions)==2) # two arms available 
@@ -607,7 +604,7 @@ if (only_placebocontrolled){
 	comparators 		<- data.frame(cbind(df_meta_TRT.md$comparator, df_meta_CTRL.md$comparator))
 	idx_nocontrol 		<- comparators %>% rowid_to_column() %>% 
 							filter(!if_any(everything(),~str_detect(., c("placebo|control")))) %>% 
-							select(rowid)															# selects where there is no placebo/control group
+							dplyr::select(rowid)															# selects where there is no placebo/control group
 	idx_remove 			<- c(idx_remove, idx_placebo, idx_nocontrol$rowid)
 	df_meta_TRT.md 	<- df_meta_TRT.md[setdiff(1:dim(df_meta_TRT.md)[1], idx_remove),]
 	df_meta_CTRL.md 	<- df_meta_CTRL.md[setdiff(1:dim(df_meta_CTRL.md)[1], idx_remove),]
@@ -652,7 +649,7 @@ dat.rct.md <- rbind(dat.rct.md, df_temp)
 
 # c. Nomoto et al. 2018 (only p-values resulting from t-test were available)
 df_temp 		<- df_meta_TRT.md  %>% rowid_to_column() %>% filter(if_any(everything(),~str_detect(., c("Nomoto"))))
-df_temp$pvalue 	<- c(.0005, .0001)
+df_temp$pvalue 	<- c(.0005, .00009)
 df_temp$tval	<- c(NA, NA)
 df_temp$dval 	<- c(NA, NA)
 df_temp$tval 	<- replmiss(df_temp$tval, with(df_temp, -1 * qt(pvalue/2, df=ni-1, lower.tail=FALSE)))
@@ -667,13 +664,12 @@ dat.rct.md$ni[df_temp$rowid] <- df_temp$ni
 
 dat_results <- rbind(dat.rct.blfu, dat.rct.md)
 
-
 # ==================================================================================================
 # C. Extract SMD of QES with baseline and follow-up data via loop
 # General settings
 
 studies2exclude 	<- c(outcomes_qes.md.prim$author, outcomes_qes.md.sec$author,
-							"Samotus et al. 2020", "Barbagallo et al. 2018") # "Spieker et al. 1995", 
+							"Samotus et al. 2020", "Barbagallo et al. 2018", "Parkinson Study Group (2007)") # "Spieker et al. 1995", 
 
 # Pre-allocate dataframes to fill later:
 df_meta_TRT.qes 		<- data.frame(matrix(, nrow = 0, ncol = 11)) 	# dataframe to fill with data, with columns according to documentation of {metafor}-package
@@ -698,16 +694,16 @@ for (o in 1:2){ # loop through primary and secondary outcomes
 
 		results_temp 		<- tibble_temp[[i]] 							# the results of the outcomes
 		outcome_temp		<- outcomes_to_test %>% 						# 
-			select(matches("outcome")) %>% 
+			dplyr::select(matches("outcome")) %>% 
 			slice(i) %>% t()
 		colnames(outcome_temp) <- "outcome"
 
 		data_of_interest 	<- data.frame(outcome_temp) %>% 		# all outcomes should be sorted as *outcome*__*comparator*_time, e.g. 'UPDRS_item20_21__pramipexole_baseline'
 			filter_all(any_vars(!is.na(.))) %>% 							# the next few lines are intended to get some details to work with
 			separate(outcome, into=c("name_outcome", "comparator_time"), sep="__", fill = "right", remove = FALSE) %>%
-			select(name_outcome, comparator_time) %>%
+			dplyr::select(name_outcome, comparator_time) %>%
 			separate(comparator_time, into=c("comparator", "time"), sep="_", fill = "right", remove = FALSE) %>%
-			select(name_outcome, comparator, time) %>%
+			dplyr::select(name_outcome, comparator, time) %>%
 			filter(across(name_outcome, ~ !grepl('adverse', .)))
 		available_interventions <- unique(data_of_interest$comparator)  	# lists the available interventions to loop through
 		
@@ -811,8 +807,8 @@ df_tempC			<- df_tempT
 df_tempC$comparator <- "placebo"	
 df_tempC$m_pre 		<- 4.9
 df_tempC$m_post 	<- 3.3
-df_tempC$sd_pre 	<- 1.8
-df_tempC$sd_post 	<- 1.8
+df_tempC$sd_pre 	<- 2.0
+df_tempC$sd_post 	<- 1.5
 df_tempC$ni			<- 15
 
 df_tempT 			<- escalc(measure="SMCR", m1i=m_post, m2i=m_pre, sd1i=sd_pre, ni=ni, ri=0, slab=source, data=df_tempT)
@@ -844,7 +840,7 @@ df_temp$treatment 	<- "adenosineA2a"
 df_temp$study_type 	<- "QES"
 df_temp$qualsyst 	<- 14/24
 df_temp$ni			<- 12
-df_temp 			<- escalc(measure="SMCR", m1i=1.0, m2i=3.6, sd1i=1.1, ni=12, ri=0, slab=slab, data=df_temp)
+df_temp 			<- escalc(measure="SMCR", m1i=1.0, m2i=3.6, sd1i=3.8, ni=12, ri=0, slab=slab, data=df_temp)
 
 dat.qes <- rbind(dat.qes, df_temp)
 
@@ -856,12 +852,13 @@ df_temp$treatment 	<- "incobotulinumtoxin"
 df_temp$study_type 	<- "QES"
 df_temp$qualsyst 	<- 11/22
 df_temp$ni			<- 48
-df_temp 			<- escalc(measure="SMCR", m1i=-1,55, m2i=0, sd1i=1.34, ni=48, ri=0, slab=slab, data=df_temp)
+df_temp 			<- escalc(measure="SMCR", m1i=-1.55, m2i=0, sd1i=1.34, ni=48, ri=0, slab=slab, data=df_temp)
 
 dat.qes <- rbind(dat.qes, df_temp)
 
 dat.qes 			<- dat.qes %>% drop_na()
 dat_results <- rbind(dat_results, dat.qes)
 
-dat_results %>% write.csv(file.path(wdir, "results", "results_meta-analysis.csv"), row.names = F) # save results to file
+con <- file.path(wdir, "results", "results_meta-analysis.csv")
+dat_results %>% write.csv(file=con, row.names = F, fileEncoding="utf-8") # save results to file
 
