@@ -19,7 +19,7 @@
 	# ==================================================================================================
 	## Specify packages of interest and load them automatically if needed
 	packages = c("readxl", "dplyr", "plyr", "tibble", "tidyr", "stringr", "openxlsx", 
-					"metafor", "tidyverse", "clubSandwich", "multcomp", "reshape2", "latex2exp") 											# packages needed
+					"metafor", "tidyverse", "clubSandwich", "multcomp", "reshape2", "latex2exp") # packages needed
 
 	## Load or install necessary packages
 	package.check <- lapply(
@@ -75,7 +75,6 @@
 	iter	<- 0
 	for (k in colnames(groups)){ # assigns category to the different treatments
 		iter 					<- iter + 1
-		# comparator_groups 		<- groups[[k]][!is.na(groups[[k]])]
 		temp 					<- dat_results %>% rowid_to_column %>% 
 									filter(if_any(everything(),~str_detect(., c(paste(groups[[k]][!is.na(groups[[k]])],collapse='|'))))) 
 		dat$category[temp$rowid]<- colnames(groups)[iter]
@@ -91,9 +90,8 @@
 	attr(dat$yi, 'slab')<- dat$slab			
 	temp 				<- dat %>% rowid_to_column %>% 
 								filter(if_any(everything(),
-										~str_detect(., c(paste(c("levodopa", "amantadine", "clozapine", 
-																	"budipine", "cannabis", "zonisamide", 
-																	"primidone", "botox"), collapse='|'))))) 
+										~str_detect(., c(paste(c("levodopa", "amantadine", "clozapine", "budipine", "cannabis", 
+																	"zonisamide", "primidone", "botox"), collapse='|'))))) 
 	dat$treatment_diff[setdiff(1:dim(dat)[1], temp$rowid)] = dat$treatment[setdiff(1:dim(dat)[1], temp$rowid)]
 
 	coal = TRUE
@@ -150,12 +148,11 @@
 	dev.off()
 
 	# Calculation of I^2 statistic
-	W <- diag(1/res$vi)
-	X <- model.matrix(res)
-	P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
-	100 * sum(res$sigma2) + (sum(res$sigma2) + (res$k-res$p)/sum(diag(P)))
-	100 * res$sigma2 / (sum(res$sigma2) + (res$k-res$p)/sum(diag(P)))
-
+	Wtot <- diag(1/res$vi)
+	Xtot <- model.matrix(res)
+	Ptot <- Wtot - Wtot %*% Xtot %*% solve(t(Xtot) %*% Wtot %*% Xtot) %*% t(Xtot) %*% W
+	100 * sum(res$sigma2) + (sum(res$sigma2) + (res$k-res$p)/sum(diag(Ptot)))
+	100 * res$sigma2 / (sum(res$sigma2) + (res$k-res$p)/sum(diag(Ptot)))
 
 	# Start plotting data using forest plot routines from {metafor}-package
 	# =================	
@@ -282,91 +279,135 @@
 	# ==================================================================================================
 	# ==================================================================================================
 
-	# Settings
-	y_lim  		<- 64
-	headings	<- c(8, 18, 30, 38, 45, 59.5 ) 
-	cex_plot  	<- 1
-
-	dat_agonists <- dat %>% filter(category %in% c("levodopa", "dopamine_agonists"))	
+	# Prepare data adding groups, an "order" and a category
+	# =================
+	dat_dopamineTotal 		<- dat %>% filter(category %in% c("levodopa", "dopamine_agonists"))	
 	remove_ergot_derivates=TRUE
-	if (remove_ergot_derivates){
-		dat_agonists <- dat_agonists %>% filter(treatment2!="dihydroergocriptin") %>% 
-			filter(treatment2!="cabergoline") %>% 
-			filter(treatment2!="pergolide")
+	if (remove_ergot_derivates){ # removes ergot derivatives as they are not marketed anymore
+		dat_dopamineTotal 	<- dat_dopamineTotal %>% filter(treatment_diff!="dihydroergocriptin") %>% 
+			filter(treatment_diff!="cabergoline") %>% 
+			filter(treatment_diff!="pergolide")
 	}
 	
-	# Imput the Variance Covariance matrix according to correlated effects (see above
-	V_mat_agonists <- impute_covariance_matrix(vi = dat_agonists$vi, cluster=dat_agonists$study, r = .7)
+	groups 	<- c("levodopa", "rotigotin", "ropinirole", "pramipexole", "piribedil", "apomorphine")
+	iter	<- 0
+	for (i in groups){ 
+		iter <- iter + 1
+		temp <- dat_dopamineTotal %>% rowid_to_column %>% 
+			filter(if_any(everything(),~str_detect(., i))) 
+		dat_dopamineTotal$order_no[temp$rowid]<- iter
+	}
+	
+	sorted_indices 	<- dat_dopamineTotal %>% dplyr::select(order_no) %>% drop_na() %>% gather(order_no) %>% 
+							count() %>% arrange(desc(order_no))# 
 
-	res_agonists <- rma.mv(yi, slab=dat_agonists$slab, V=V_mat_agonists,
-					random = ~1 | treatment/study,, #~ 1 | slab, #/factor(study_type)# , 
-					mods= ~ qualsyst*study_type, tdist=TRUE, #struct="DIAG",
-					data=dat_agonists, verbose=FALSE, control=list(optimizer="optim", optmethod="Nelder-Mead"))
-	# Run some diagnostics on the model with all studies/categories
+	# Prepare additional information necessary to plot data correctly, i.e. distances between subgroups etc.
+	# =================
+	xrows_temp 		<- 1:150
+	spacing 		<- 5 
+	start 			<- 3
+	xrows 			<- c()
+	headings 		<- c()
+
+	for (i in 1:dim(sorted_indices)[1]){
+		vector_group 	<- xrows_temp[start:(start+sorted_indices[i,2]-1)]
+		xrows 			<- c(xrows, vector_group)
+		headings 		<- c(headings, start+sorted_indices[i,2]-1 + 1.5)
+		start 			<- start+sorted_indices[i,2] + 4
+	} 
+	
+	# Settings
+	y_lim  		<- 64
+	y_lim 		<- start 	# use last "start" as y-limit for forest plot
+
+	#headings	<- c(8, 18, 30, 38, 45, 59.5 ) 
+	cex_plot  	<- 1
+
+	# Impute Variance Covariance matrix according to correlated effects (see above)
+	# =================
+	V_mat_agonists <- impute_covariance_matrix(vi = dat_dopamineTotal$vi, cluster=dat_dopamineTotal$study, r = .7)
+
+	# Run random effects meta-analysis using some "moderators" (qualsyst scores and study_type)
+	# =================	
+	res_agonistsTotal <- rma.mv(yi, slab=dat_dopamineTotal$slab, V=V_mat_agonists,
+						random = ~1 | treatment/study, #~ 1 | slab, #/factor(study_type)# , 
+						mods= ~ qualsyst*study_type, tdist=TRUE, #struct="DIAG",
+						data=dat_dopamineTotal, verbose=FALSE, control=list(optimizer="optim", optmethod="Nelder-Mead"))
+	
+	# Run model diagnostics
+	# =================	
+	# Export diagnostics (profile) on model with all studies/categories	
+	svg(filename=file.path(wdir, "results", "supplFigure.profile_all_agonists.v1.0.svg"))
 	par(mfrow=c(2,1))
-	profile(res_agonists, sigma2=1, steps=50)
-	profile(res_agonists, sigma2=2, steps=50)
-	dev.copy(svg,file.path(wdir, "results", "supplFigure.profile_all_agonists.v1.0.svg"),width = 8.27,height = 11.69)
+	profile(res_agonistsTotal, sigma2=1, steps=50, main=TeX(r'(Profile plot for $\sigma^{2}_{1}$ (factor = category))'))
+	title("Profile Likelihood Plot for model including only levodopa and dopamine agonists", line = -1, outer = TRUE)
+	profile(res_agonistsTotal, sigma2=2, steps=50, main=TeX(r'(Profile plot for $\sigma^{2}_{2}$ (factor = category/study_type))'))
 	dev.off()
 
 	# Calculation of I^2 statistic
-	W <- diag(1/res_agonists$vi)
-	X <- model.matrix(res_agonists)
-	P <- W - W %*% X %*% solve(t(X) %*% W %*% X) %*% t(X) %*% W
-	100 * sum(res_agonists$sigma2) + (sum(res_agonists$sigma2) + (res_agonists$k-res_agonists$p)/sum(diag(P)))
-	100 * res_agonists$sigma2 / (sum(res_agonists$sigma2) + (res_agonists$k-res_agonists$p)/sum(diag(P)))
+	Wago <- diag(1/res$vi)
+	Xago <- model.matrix(res)
+	Pago <- Wago - Wago %*% Xago %*% solve(t(Xago) %*% Wago %*% Xago) %*% t(Xago) %*% Wago
+	100 * sum(res$sigma2) + (sum(res$sigma2) + (res$k-res$p)/sum(diag(Pago)))
+	100 * res$sigma2 / (sum(res$sigma2) + (res$k-res$p)/sum(diag(Pago)))
 	
-	# Start plotting data using a forest plot
-	windowsFonts("Arial" = windowsFont("Arial"))
-	forest(res_agonists, xlim=c(-10, 4.6), at=log(c(0.05, 0.25, 1, 4)), atransf=exp,
-		   ilab=cbind(sprintf("%.02f",  dat_agonists$qualsyst), dat_agonists$ni, 
-		   paste0(formatC(weights(res_agonists), format="f", digits=1, width=4), "%"),
-		   dat_agonists$study_type), #, dat$tneg, dat$cpos, dat$cneg),
-		   ilab.xpos=c(2.5, -5, 3, 2), 
-		   xlab="Standardized mean change", #ilab.xpos=c(-9.5,-8,-6,-4.5), 
-		   cex=cex_plot, ylim=c(-1, y_lim),
-		   rows=c(3:6, 11:16, 21:28, 33:36, 41:43, 48:57),
-		   #slab=dat$slab, 
-		   #order=dat$order,
-		   efac =c(.75),
-		   mlab=mlabfun("RE Model for All Studies", res_agonists),
-		   font=4, header="Author(s) and Year")
-
+	# Start plotting data using forest plot routines from {metafor}-package
+	# =================	
+	cex_plot 	<- 1 		# plot size
+	y_lim 		<- start 	# use last "start" as y-limit for forest plot
+	y_offset 	<- .5		# offset used to plot the header of the column
+	svg(filename=file.path(wdir, "results", "meta_analysis.agonists_levodopa.v2.1.svg"))
+	windowsFonts("Arial" = windowsFont("TT Arial"))
+	forest(res_agonistsTotal, xlim=c(-10, 4.6), #at=log(c(0.05, 0.25, 1, 4)), atransf=exp,
+			ilab=cbind(dat_dopamineTotal$ni, dat_dopamineTotal$study_type, 
+			sprintf("%.02f",  dat_dopamineTotal$qualsyst), 
+			paste0(formatC(weights(res_agonistsTotal), format="f", digits=1, width=4), "%")),
+			xlab="Standardised mean change [SMCR]",
+			ilab.xpos=c(-5, 2.5, 3, 3.5), 
+			cex=cex_plot, ylim=c(-1, y_lim),
+			rows=xrows,
+			efac =c(.8), #offset=y_offset, 
+			mlab=mlabfun("RE Model for All Studies", res_agonistsTotal),
+			font=4, header="Author(s) and Year")
+		   
 	### set font expansion factor (as in forest() above) and use a bold font
-	op <- par(cex=0.5, font=4, mar = c(2, 2, 2, 2))
-	
-	### add additional column headings to the plot
-	text(c(2.5), cex=1, y_lim, c("QualSyst"))
-	text(c(2.5), cex=1, y_lim-1, c("score"))
-	text(c(3), cex=1, y_lim-1, c("weight"))
-	text(c(-5), cex=1, y_lim-1, c("n"))
-	#text(c(-4), cex=1, y_lim-1, c("agent"))
-	text(c(2), cex=1, y_lim-1, c("type"))
+	op <- par(font=2, mar = c(2, 2, 2, 2))
+
+	text((c(-.5, .5)), cex=cex_plot, y_lim, c("Tremor reduction", "Tremor increase"), 
+			pos=c(2, 4), offset=y_offset)
+
+	### Add column headings for everything defined in "forest::ilab"
+	text(c(-5), cex=cex_plot, y_lim-y_offset, c("n"))
+	# text(c(-4), cex=cex_plot, y_lim-y_offset, c("agent"))
+	text(c(2.5), cex=cex_plot, y_lim-y_offset, c("type"))
+	text(c(3), cex=cex_plot, y_lim+3*y_offset, c("QualSyst"))
+	text(c(3), cex=cex_plot, y_lim-y_offset, c("score"))
+	text(c(3.5), cex=cex_plot, y_lim-y_offset, c("weight"))
 		
 	### Switch to bold italic font
 	par(font=4)
 
 	### Adds text for subgroups
-	text(-10, sort(headings, decreasing=TRUE), pos=4, cex=1.5, c(sprintf("Levodopa (n = %s)", sum(dat_agonists$ni[dat_agonists$treatment2=="levodopa"])),
-								   sprintf("Rotigotine (n = %s)", sum(dat_agonists$ni[dat_agonists$treatment2=="rotigotine"])),
-								   sprintf("Ropinirole (n = %s)", sum(dat_agonists$ni[dat_agonists$treatment2=="ropinirole"])),
-								   sprintf("Pramipexole (n = %s)", sum(dat_agonists$ni[dat_agonists$treatment2=="pramipexole"])),
-								   sprintf("Piribedil (n = %s)", sum(dat_agonists$ni[dat_agonists$treatment2=="piribedil"])),
-								   sprintf("Apomorphine (n = %s)", sum(dat_agonists$ni[dat_agonists$treatment2=="apomorphine"]))))
+	text(-10, sort(headings, decreasing=TRUE), pos=4, cex=cex_plot*1.1, c(sprintf("Levodopa (n = %s)", sum(dat_dopamineTotal$ni[dat_dopamineTotal$treatment_diff=="levodopa"])),
+								   sprintf("Rotigotine (n = %s)", sum(dat_dopamineTotal$ni[dat_dopamineTotal$treatment_diff=="rotigotine"])),
+								   sprintf("Ropinirole (n = %s)", sum(dat_dopamineTotal$ni[dat_dopamineTotal$treatment_diff=="ropinirole"])),
+								   sprintf("Pramipexole (n = %s)", sum(dat_dopamineTotal$ni[dat_dopamineTotal$treatment_diff=="pramipexole"])),
+								   sprintf("Piribedil (n = %s)", sum(dat_dopamineTotal$ni[dat_dopamineTotal$treatment_diff=="piribedil"])),
+								   sprintf("Apomorphine (n = %s)", sum(dat_dopamineTotal$ni[dat_dopamineTotal$treatment_diff=="apomorphine"]))))
 
 	### set par back to the original settings
 	par(op)
 
 	### fit random-effects model in all subgroups
-	res.apo <- rma(yi, vi, subset=(treatment2=="apomorphine"), data=dat_agonists)
+	res.apo <- rma(yi, vi, subset=(treatment_diff=="apomorphine"), data=dat_dopamineTotal)
 	# res.cab <- rma(yi, vi, subset=(treatment2=="cabergoline"), data=dat_agonists)
 	# res.per <- rma(yi, vi, subset=(treatment2=="pergolide"), data=dat_agonists)
 	# res.dih <- rma(yi, vi, subset=(treatment2=="dihydroergocriptin"), data=dat_agonists)
-	res.rot <- rma(yi, vi, subset=(treatment2=="rotigotine"), data=dat_agonists)
-	res.rop <- rma(yi, vi, subset=(treatment2=="ropinirole"), data=dat_agonists)
-	res.pir <- rma(yi, vi, subset=(treatment2=="piribedil"), data=dat_agonists)
-	res.pra <- rma(yi, vi, subset=(treatment2=="pramipexole"), data=dat_agonists)
-	res.lev <- rma(yi, vi, subset=(treatment2=="levodopa"), data=dat_agonists)
+	res.rot <- rma(yi, vi, subset=(treatment_diff=="rotigotine"), data=dat_dopamineTotal)
+	res.rop <- rma(yi, vi, subset=(treatment_diff=="ropinirole"), data=dat_dopamineTotal)
+	res.pir <- rma(yi, vi, subset=(treatment_diff=="piribedil"), data=dat_dopamineTotal)
+	res.pra <- rma(yi, vi, subset=(treatment_diff=="pramipexole"), data=dat_dopamineTotal)
+	res.lev <- rma(yi, vi, subset=(treatment_diff=="levodopa"), data=dat_dopamineTotal)
 
 	yshift = .2
 	fac_cex = .75
@@ -381,35 +422,50 @@
 	abline(h=0)
 	
 	### fit meta-regression model to test for subgroup differences
-	dat_agonists$treatment2 <- as.factor(dat_agonists$treatment2)
+	dat_dopamineTotal$treatment_diff <- as.factor(dat_dopamineTotal$treatment_diff)
 	groups <- c("levodopa", "apomorphine", "piribedil", "pramipexole", "ropinirole", "rotigotine")
-	levels(dat_agonists) <- groups
-	res_overall_agonists <- rma(yi, vi, mods = ~ treatment2 - 1, data=dat_agonists)
+	levels(dat_dopamineTotal) <- groups
+	res_overall_agonistsTotal <- rma(yi, vi, mods = ~ treatment_diff - 1, data=dat_dopamineTotal)
 
 	### add text for the test of subgroup differences
 	text(-10, -1.8, pos=4, cex=cex_plot, bquote(paste("Test for Subgroup Differences: ",
-		 "Q[M]", " = ", .(formatC(res_overall_agonists$QM, digits=2, format="f")), ", df = ", .(res_overall_agonists$p - 1),
-		 ", p = ", .(formatC(res_overall_agonists$QMp, digits=3, format="f")))))
+		 "Q[M]", " = ", .(formatC(res_overall_agonistsTotal$QM, digits=2, format="f")), ", df = ", .(res_overall_agonistsTotal$p - 1),
+		 ", p = ", .(formatC(res_overall_agonistsTotal$QMp, digits=3, format="f")))))
+	dev.off()
 	
-	# Run posthoc analyses and plot results as heatmap 
-	pwc 			<- summary(glht(res_overall_agonists, linfct=cbind(contrMat(rep(1,6), type="Tukey"))), test=adjusted("BH")) # pairwise comparisons
-	mat <- matrix(0, nrow = 6, ncol = 6, dimnames=list(groups, groups))
-	mat[lower.tri(mat, diag = FALSE)] <- unname(pwc$test$pvalues)
-	
-	melted_cormat <- melt(mat, na.rm = TRUE)
+	# Run post-hoc analyses
+	# =================	
+	pwc 					<- summary(glht(res_overall_agonistsTotal, linfct=cbind(contrMat(rep(1,6), type="Tukey"))), 
+							test=adjusted("BH")) # pairwise comparisons
+	mat2plot 				<- matrix(0, nrow = 6, ncol = 6, dimnames=list(toupper(substr(groups, 1, 3)), toupper(substr(groups, 1, 3)))) + + diag(6)/1000000
+	mat_significance 		<- mat2plot 
+	mat2plot[lower.tri(mat2plot, diag = FALSE)] <- unname(pwc$test$tstat)
+	mat_significance[lower.tri(mat2plot, diag = FALSE)] <- unname(pwc$test$pvalues)
+	melted_cormat 			<- melt(mat2plot, na.rm = TRUE) # converts to "long" format
+	melted_cormat$pval 		<- melt(mat_significance, na.rm = TRUE) %>% dplyr::select(value)
+	melted_cormat$pval 		<- melted_cormat$pval$value # dodgy solution
+	colnames(melted_cormat)	<-c("Var1", "Var2", "tstat", "pval")
+	melted_cormat[melted_cormat==0] <- NA # remove zero values and convert to NA
+	melted_cormat$pval[melted_cormat$pval<.05 & melted_cormat$pval>.001] <- "*"
+	melted_cormat$pval[melted_cormat$pval<.001] <- "**"
+	melted_cormat$pval[melted_cormat$pval>.05] <- NA
 
-	# Heatmap
-	ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
-	  geom_tile(color = "white")+
-	  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-						   midpoint = 0, limit = c(0,1), space = "Lab", 
-						   name="Significance \n (p_val)") +
-	  geom_text(aes(label = round(value, 3))) +
-	  theme_minimal()+ 
-	  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-									   size = 12, hjust = 1)) +
-  coord_fixed()
-	
+	# Create a heatmap for pairwise comparisons
+	svg(filename=file.path(wdir, "results", "heatmaps.agonists_levodopa.v1.0.svg"))
+	windowsFonts("Arial" = windowsFont("TT Arial"))
+	ggplot(data = melted_cormat %>% drop_na(-pval), aes(Var2, Var1, fill = tstat))+
+		geom_tile(color = "white")+
+		scale_fill_gradient2(mid="#FBFEF9",low="#0C6291",high="#A63446", limits=c(-5,5),space = "Lab", 
+						   name="T-statistics") +
+		geom_text(aes(label = pval)) +
+		ylab(NULL)  + xlab(NULL) +
+		ggtitle("Pairwise comparison between levodopa and dopamine agonists") + 
+		theme_minimal() +
+		#theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+									   #size = 12, hjust = 1), 
+									   #axis.text.x=element_blank()) +
+		coord_fixed()
+	dev.off()
 	
 	# ==================================================================================================
 	# ==================================================================================================
