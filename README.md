@@ -37,9 +37,9 @@ Resident at the Department of Neurology,
 Movement Disorders and Neuromodulation, University Hospital Giessen and Marburg
 
 ## Links
-https://bmjopen.bmj.com/content/11/8/e048367.abstract
-https://www.crd.york.ac.uk/prospero/display_record.php?RecordID=202911
-https://www.uni-marburg.de/de/fb20/bereiche/kopfz/neurologie/forschung/agbun/
+- https://bmjopen.bmj.com/content/11/8/e048367.abstract
+- https://www.crd.york.ac.uk/prospero/display_record.php?RecordID=202911
+- https://www.uni-marburg.de/de/fb20/bereiche/kopfz/neurologie/forschung/agbun/
 
 ## License
 This project is licensed under the terms of the MIT license.
