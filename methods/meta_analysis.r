@@ -3,7 +3,7 @@
 # code in analysis_dataframe.r 
 # Code developed by David Pedrosa
 
-# Version 1.4 # 2022-07-04, removed unnecessary parts of the code
+# Version 1.6 # 2022-09-06, final changes to analyses with some minor modifications in the groups
 
 # ==================================================================================================
 ## In case of multiple people working on one project, this helps to create an automatic script
@@ -18,7 +18,7 @@ setwd(wdir)
 # ==================================================================================================
 ## Specify packages of interest and load them automatically if needed
 packages = c("readxl", "dplyr", "plyr", "tibble", "tidyr", "stringr", "openxlsx", "rstatix", "ggpubr",
-"metafor", "tidyverse", "clubSandwich", "multcomp", "reshape2", "latex2exp") # packages needed
+"metafor", "tidyverse", "clubSandwich", "multcomp", "reshape2", "latex2exp", "irr", "tableone") # packages needed
 
 ## Load or install necessary packages
 package.check <- lapply(
@@ -43,7 +43,6 @@ mlabfun <- function(text, res) { # helper function to add Q-test, I^2, and tau^2
   tau^2, " = ", .(formatC(res$tau2, digits=2, format="f")), ")")))}
 # =================================================================================================
 
-# Start analyses:
 # ==================================================================================================
 # A. Three-level hierarchical model including all studies for effect sizes and category as 2nd level
 # ==================================================================================================
@@ -54,16 +53,16 @@ dat_results <- read.csv(file.path(wdir, "results", "results_meta-analysis.csv"),
 stringsAsFactors = F,  encoding="UTF-8")
 
 groups <- data.frame(	levodopa=c("levodopa", rep(NA, 8)), # adds groups to dataframe
-						betablocker=c("propanolol", "zuranolone", "nipradilol", rep(NA, 6)),
+						betablocker=c("propanolol", "nipradilol", rep(NA, 7)), # zuranolone is no beta-blocker, as in previous versions
 						primidone=c("primidone", rep(NA, 8)),
 						anticholinergics=c("trihexphenidyl", "benztropin", "clozapine", rep(NA,6 )),
-						  # anticholinergics=c("trihexphenidyl", "benztropin", rep(NA,7 )),
-						amantadine=c("amantadine", rep(NA, 8)), 
+						amantadine=c("amantadine", rep(NA, 8)),
+						memantine=c("memantine", rep(NA, 8)), 
 						dopamine_agonists=c("ropinirole", "rotigotine", "apomorphine", "pramipexole", 
 						"piribedil", "bromocriptine", "pergolide", "cabergoline", 
 						"dihydroergocriptin"), 
-						# clozapine=c("clozapine", rep(NA, 8)), ## was added to anticholinergics 
 						mao_inhibitors=c("rasagiline", "selegiline", "safinamide", rep(NA, 6)),
+						gabaergic_medication=c("clonazepam", "zuranolone", "gabapentin", rep(NA,6 )),
 						cannabis=c("cannabis", rep(NA, 8)), 
 						budipine=c("budipine", rep(NA, 8)),
 						zonisamide=c("zonisamide", rep(NA, 8)),
@@ -98,12 +97,17 @@ if (coal==TRUE) { # merges columns from "treatment" and "treatment_diff" where N
 	dat <- dat %>% mutate(treatment_diff = coalesce(treatment_diff, treatment))
 }
 
-# Prepare contingency table for quality of life estimates
+# Prepare contingency table for quality of life estimates (Table 2 in the manuscript)
 # =================
 dat <- dat %>% mutate(., qualsyst_cat = case_when(
 	qualsyst <= .50 ~ "low",
 	(qualsyst > .50 & qualsyst < .70) ~ "medium",
 	qualsyst >= .70 ~ "high"))
+
+dat %>%
+	group_by(study_type, qualsyst_cat) %>%
+	dplyr::summarise(count = n()) %>%
+	spread(qualsyst_cat, count)
 
 # Prepare additional information necessary to plot data correctly, i.e. distances between subgroups etc.
 # =================
@@ -153,7 +157,7 @@ res_wo2 <- rma.mv(yi, slab=dat$slab, V=V_mat,
 comp_allstudies1 <- anova(res, res_wo1)
 comp_allstudies2 <- anova(res, res_wo2)
 
-# Three-level meta analysis with levels studies and categories (of agents);
+# Three-level meta analysis with levels 1. studies and 2. categories (of agents);
 # Results show sigma1: variance between effect sizes within studies and sigma2: values between subgroups (categories 
 # of treatment). Moreover is shows the amount (if at all) to which effects are influenced by other factors (moderators). 
 # Finally, to see whether there is significant heterogeneity in the groups, comparisons of models with and without one
@@ -161,7 +165,7 @@ comp_allstudies2 <- anova(res, res_wo2)
 
 # Run model diagnostics
 # =================
-# Export diagnostics (profile) on model with all studies/categories
+# Export diagnostics (profile) on model with all studies/categories (Supplementary Figure 1)
 svg(filename=file.path(wdir, "results", "supplFigure.profile_all_groups.v1.0.svg"))
 par(mfrow=c(2,1))
 profile(res, sigma2=1, steps=50, main=TeX(r'(Profile plot for $\sigma^{2}_{1}$ (factor = category))'))
@@ -181,7 +185,7 @@ Ptot 	<- Wtot - Wtot %*% Xtot %*% solve(t(Xtot) %*% Wtot %*% Xtot) %*% t(Xtot) %
 cex_plot <- 1 # plot size
 y_lim <- start # use last "start" as y-limit for forest plot
 y_offset <- .5# offset used to plot the header of the column
-svg(filename=file.path(wdir, "results", "meta_analysis.all_groups.v2.1.svg"))
+# svg(filename=file.path(wdir, "results", "meta_analysis.all_groups.v2.1.svg"))
 if (Sys.info()['sysname']!="Linux") {windowsFonts("Arial" = windowsFont("TT Arial"))}
 
 forest(res, xlim=c(-7, 4.6), at=c(-3, -2, -1, 0, 1, 2), #atransf=exp,
@@ -220,9 +224,10 @@ sprintf("beta-blocker (n = %s)", sum(dat$ni[dat$category=="betablocker"])),
 sprintf("Primidone (n = %s)", sum(dat$ni[dat$category=="primidone"])),
 sprintf("Anticholinergics (n = %s)", sum(dat$ni[dat$category=="anticholinergics"])),
 sprintf("Amantadine (n = %s)", sum(dat$ni[dat$category=="amantadine"])),
+sprintf("Memantine (n = %s)", sum(dat$ni[dat$category=="memantine"])),
 sprintf("Dopamine agonists (n = %s)", sum(dat$ni[dat$category=="dopamine_agonists"])), 
-#sprintf("Clozapine (n = %s)", sum(dat$ni[dat$category=="clozapine"])), 
 sprintf("MAO-inhibitor (n = %s)", sum(dat$ni[dat$category=="mao_inhibitors"])), 
+sprintf("Gabaergic medication (n = %s)", sum(dat$ni[dat$category=="gabaergic_medication"])), 
 sprintf("Cannabis (n = %s)", sum(dat$ni[dat$category=="cannabis"])),
 sprintf("Budipine (n = %s)", sum(dat$ni[dat$category=="budipine"])),
 sprintf("Zonisamide (n = %s)", sum(dat$ni[dat$category=="zonisamide"])),
@@ -232,37 +237,37 @@ sprintf("Botulinum toxin (n = %s)", sum(dat$ni[dat$category=="botox"])))
 
 ### set par back to the original settings
 par(op)
- 
 ### fit random-effects model in all subgroups
 res.lev <- rma(yi, vi, subset=(category=="levodopa"), data=dat)
 res.bet <- rma(yi, vi, subset=(category=="betablocker"), data=dat)
 res.pri <- rma(yi, vi, subset=(category=="primidone"), data=dat)
 res.cho <- rma(yi, vi, subset=(category=="anticholinergics"), data=dat)
+res.mem <- rma(yi, vi, subset=(category=="memantine"),  data=dat)
 res.ama <- rma(yi, vi, subset=(category=="amantadine"),     data=dat)
 res.dag <- rma(yi, vi, subset=(category=="dopamine_agonists"),  data=dat)
-# res.clo <- rma(yi, vi, subset=(category=="clozapine"),  data=dat) ## was added to anticholinergics
 res.mao <- rma(yi, vi, subset=(category=="mao_inhibitors"),     data=dat)
+res.gab <- rma(yi, vi, subset=(category=="gabaergic_medication"),  data=dat)
 res.cbd <- rma(yi, vi, subset=(category=="cannabis"),  data=dat)
 res.bud <- rma(yi, vi, subset=(category=="budipine"),  data=dat)
 res.zon <- rma(yi, vi, subset=(category=="zonisamide"),  data=dat)
 res.ade <- rma(yi, vi, subset=(category=="adenosine_antagonist"),  data=dat)
 res.bot <- rma(yi, vi, subset=(category=="botox"),  data=dat)
 
-par(font=4)
-
+par(font=3)
 yshift = .2
 fac_cex = 1
 if (Sys.info()['sysname']!="Linux") {windowsFonts("Arial" = windowsFont("TT Arial"))}
 
 ### add summary polygons for the three subgroups
-addpoly(res.lev, row= 114.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.lev), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.bet, row= 107.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.bet), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.pri, row= 102.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.pri), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.cho, row= 91.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.bet), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.ama, row= 85.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.ama), cex=cex_plot*fac_cex, efac = c(.5))
-# addpoly(res.clo, row= 60.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.clo), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.dag, row= 51.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.dag), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.mao, row= 35.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.mao), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.lev, row= 125.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.lev), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.bet, row= 119.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.bet), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.pri, row= 114.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.pri), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.cho, row= 103.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.bet), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.ama, row= 97.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.ama), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.mem, row= 92.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.mem), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.dag, row= 58.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.dag), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.mao, row= 42.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.mao), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.gab, row= 35.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.gab), cex=cex_plot*fac_cex, efac = c(.5))
 addpoly(res.cbd, row= 30.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.cbd), cex=cex_plot*fac_cex, efac = c(.5))
 addpoly(res.bud, row= 22.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.bud), cex=cex_plot*fac_cex, efac = c(.5))
 addpoly(res.zon, row= 16.5+yshift, mlab=mlabfun("RE Model for Subgroup", res.zon), cex=cex_plot*fac_cex, efac = c(.5))
@@ -278,7 +283,7 @@ res_sg <- rma(yi, vi, mods = ~ category, data=dat)
 text(-10, -1.8, pos=4, cex=cex_plot, bquote(paste("Test for Subgroup Differences: ",
 "Q[M]", " = ", .(formatC(res_sg$QM, digits=2, format="f")), ", df = ", .(res_sg$p - 1),
 ", p = ", .(formatC(res_sg$QMp, digits=3, format="f")))))
-# addpoly(res_sg, row= -1.8, mlab=mlabfun("RE Model for Subgroup", res_sg), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res_sg, row= -1.8, mlab=mlabfun("RE Model for Subgroup", res_sg), cex=cex_plot*fac_cex, efac = c(.5))
 if (Sys.info()['sysname']!="Linux") {windowsFonts("Arial" = windowsFont("TT Arial"))}
 dev.off()
 
@@ -287,9 +292,9 @@ dev.off()
 # Estimate bias according to funnel plot and Egger's statistics
 svg(filename=file.path(wdir, "results", "funnel.all_groups.v1.0.svg"))
 funnel_contour <- funnel(res, level=c(90, 95, 99), back="gray95",
-                  shade=c("white", "gray75", "gray85", "gray95"), 
-                  refline=0, legend="topleft", ylim=c(0, .8), las=1, digits=list(1L, 1), 
-  xlab="Standardized mean change")
+					shade=c("white", "gray75", "gray85", "gray95"), 
+					refline=0, legend="topleft", ylim=c(0, .8), las=1, digits=list(1L, 1), 
+					xlab="Standardized mean change")
 dev.off() 
 
 dat$residuals<- residuals.rma(res)
@@ -395,8 +400,8 @@ dev.off()
 WagoRCT <- diag(1/res_agonistsRCT$vi)
 XagoRCT <- model.matrix(res_agonistsRCT)
 PagoRCT <- WagoRCT - WagoRCT %*% XagoRCT %*% solve(t(XagoRCT) %*% WagoRCT %*% XagoRCT) %*% t(XagoRCT) %*% WagoRCT
-100 * sum(res_agonistsRCT$sigma2) + (sum(res_agonistsRCT$sigma2) + (res_agonistsRCT$k-res_agonistsRCT$p)/sum(diag(Pago)))
-100 * res_agonistsRCT$sigma2 / (sum(res_agonistsRCT$sigma2) + (res_agonistsRCT$k-res_agonistsRCT$p)/sum(diag(Pago)))
+100 * sum(res_agonistsRCT$sigma2) + (sum(res_agonistsRCT$sigma2) + (res_agonistsRCT$k-res_agonistsRCT$p)/sum(diag(PagoRCT)))
+100 * res_agonistsRCT$sigma2 / (sum(res_agonistsRCT$sigma2) + (res_agonistsRCT$k-res_agonistsRCT$p)/sum(diag(PagoRCT)))
 
 # Start plotting data using forest plot routines from {metafor}-package
 # =================
@@ -514,7 +519,6 @@ theme_minimal() +
 coord_fixed()
 dev.off()
 
-
 # ==================================================================================================
 # C. Two-level hierarchical model with studies using mao-inhibitors (only RCTs)
 # ==================================================================================================
@@ -581,10 +585,9 @@ for (i in 1:dim(sorted_indices)[1]){
 # =================
 V_mat_maoRCT <- impute_covariance_matrix(vi = dat_maoRCT$vi, cluster=dat_maoRCT$study, r = .7)
 
-# Run random effects meta-analysis using moderators (qualsyst scores), study_type obviously not necessary anymore
-# =================
+
 res_maoRCT		<- rma.mv(yi, slab=dat_maoRCT$slab, V=V_mat_maoRCT,
-					random = ~1 | treatment/study, #~ 1 | slab, #/factor(study_type)# , 
+					random = ~1 | as.factor(treatment)/study, #~ 1 | slab, #/factor(study_type)# , 
 					mods= ~ qualsyst, tdist=TRUE, #struct="DIAG",
 					data=dat_maoRCT, verbose=FALSE, control=list(optimizer="optim", optmethod="Nelder-Mead"))
 res_maoRCT_wo1	<- rma.mv(yi, slab=dat_maoRCT$slab, V=V_mat_maoRCT,
@@ -723,171 +726,171 @@ coord_fixed()
 dev.off()
 
 # ==================================================================================================
-# ==================================================================================================
 # D. Three-level hierarchical model with all studies included for adverse events
 # ==================================================================================================
-# ==================================================================================================
 
-# Load data
-dat_adverse_events <- read_excel(file.path(wdir, "results_adverse-events.v2.0.xlsx"))
-dat_adverse_events <- dat_adverse_events %>% na_if("NA") %>% drop_na(ae1i, ae2i, n1i, n2i) %>% 
-mutate_at(c('ae1i', 'ae2i','do1i', 'do2i', 'n1i', 'n2i', 
-'age1', 'age2', 'updrs1', 'updrs2'), as.numeric)# drop NA values in ae1i convert to numeric
-dat_adverse_events <- dat_adverse_events %>% dplyr::filter(.,study_type=="RCT")
-dat_adverse_events$study.id <- 1:dim(dat_adverse_events)[1]
-attr(dat_adverse_events$yi, 'slab')<- dat_adverse_events$slab
+# Load and prepare data
+# =================
+dat_aes 				<- read_excel(file.path(wdir, "results_adverse-events.v2.0.xlsx"))
+do_stats				<- mean(100*as.numeric(dat_aes$do2i)/as.numeric(dat_aes$n2i), na.rm=T) # adapt according to needed value 		
+dat_aes 				<- dat_aes %>% dplyr::filter(treatment2!="pergolide") %>% na_if("NA") %>% drop_na(ae1i, ae2i, n1i, n2i) %>% 
+						mutate_at(c(	'ae1i', 'ae2i','do1i', 'do2i', 'n1i', 'n2i', 
+										'age1', 'age2', 'updrs1', 'updrs2'), as.numeric)# drop NA values in ae1i convert all necessary columns to numeric
+dat_aes					<- dat_aes %>% dplyr::filter(.,study_type=="RCT")
+dat_aes$study.id		<- 1:dim(dat_aes)[1]
+attr(dat_aes$yi, 'slab')<- dat_aes$slab
 
-dat_adverse_events$order_no[dat_adverse_events$order_no==5] = 1
-dat_adverse_events$order_no[dat_adverse_events$order_no==6] = 2
-dat_adverse_events$order_no[dat_adverse_events$order_no==7] = 3
-dat_adverse_events$order_no[dat_adverse_events$order_no==8] = 4
-dat_adverse_events$order_no[dat_adverse_events$order_no==10] = 5
-dat_adverse_events$order_no[dat_adverse_events$order_no==12] = 6
+dat_aes$order_no[dat_aes$order_no==5] <- 1 # order is changed manually
+dat_aes$order_no[dat_aes$order_no==6] <- 2
+dat_aes$order_no[dat_aes$order_no==7] <- 3
+dat_aes$order_no[dat_aes$order_no==8] <- 4
+dat_aes$order_no[dat_aes$order_no==10]<- 5
+dat_aes$order_no[dat_aes$order_no==12]<- 6
 
-dat_adverse_events <- dat_adverse_events %>% drop_na(do1i, do2i)
-dat_adverse_events$study.id <- 1:dim(dat_adverse_events)[1]
+# dat_aes 				<- dat_aes %>% drop_na(do1i, do2i) not needed at this point
+dat_aes$study.id 		<- 1:dim(dat_aes)[1]
 
-
-
-sorted_indices <- dat_adverse_events %>% dplyr::select(order_no) %>% drop_na() %>% gather(order_no) %>% 
-count() %>% arrange(desc(order_no))# 
+sorted_indices 			<- dat_aes %>% dplyr::select(order_no) %>% drop_na() %>% gather(order_no) %>% 
+							count() %>% arrange(desc(order_no))# 
 
 # Prepare additional information necessary to plot data correctly, i.e. distances between subgroups etc.
 # =================
-xrows_temp <- 1:150
-spacing <- 5 
-start <- 3
-xrows <- c()
-headings <- c()
+xrows_temp 	<- 1:150
+spacing 	<- 5 
+start 		<- 3
+xrows 		<- c()
+headings 	<- c()
 
 for (i in 1:dim(sorted_indices)[1]){
-vector_group <- xrows_temp[start:(start+sorted_indices[i,2]-1)]
-xrows <- c(xrows, vector_group)
-headings <- c(headings, start+sorted_indices[i,2]-1 + 1.5)
-start <- start+sorted_indices[i,2] + 4
+	vector_group<- xrows_temp[start:(start+sorted_indices[i,2]-1)]
+	xrows 		<- c(xrows, vector_group)
+	headings 	<- c(headings, start+sorted_indices[i,2]-1 + 1.5)
+	start 		<- start+sorted_indices[i,2] + 4
 } 
 
-dat_adverse_events <- escalc(measure="PETO", ai=dat_adverse_events$do1i, 
-bi=dat_adverse_events$n1i - dat_adverse_events$do1i, 
-ci=dat_adverse_events$do2i, 
-di=dat_adverse_events$n2i - dat_adverse_events$do2i,
-n1i=n1i, n2i=n2i,
-add=1/2, to="only0", data=dat_adverse_events)
+dat_aes <- escalc(measure="RR", ai=dat_aes$ae1i, 
+					bi=dat_aes$n1i - dat_aes$ae1i, 
+					ci=dat_aes$ae2i, 
+					di=dat_aes$n2i - dat_aes$ae2i,
+					n1i=n1i, n2i=n2i,
+					add=1/2, to="all", data=dat_aes)
 
 # Impute variance-covariance-matrix according to correlated effects (see above)
 # =================
-V_matAE <- impute_covariance_matrix(vi = dat_adverse_events$vi, cluster=dat_adverse_events$study, r = .7)
+V_matAE <- impute_covariance_matrix(vi = dat_aes$vi, cluster=dat_aes$study, r = .7)
 
-fit <- rma.mv(yi, slab=dat_adverse_events$slab, V=V_matAE, random = ~ 1 | as.factor(category)/study.id,
-data=dat_adverse_events, mods= ~ qualsyst, method="REML")
+fit_ae 	<- rma.mv(yi, slab=dat_aes$slab, V=V_matAE, random = ~ 1 | as.factor(category)/study.id,
+					data=dat_aes, mods= ~ qualsyst, method="REML")
 
-cex_plot <- 1 # plot size
-y_lim <- 50 # use last "start" as y-limit for forest plot
-y_offset <- .5# offset used to plot the header of the column
+cex_plot<- 1 # plot size
+y_lim 	<- 50 # use last "start" as y-limit for forest plot
+y_offset<- .5# offset used to plot the header of the column
 # svg(filename=file.path(wdir, "results", "meta_analysis.agonistsRCT.v1.0.svg"))
 windowsFonts("Arial" = windowsFont("TT Arial"))
-forest(fit, xlim=c(-5, 10), at=log(c(0.25, 1, 5)), atransf=exp,
-ilab=cbind(dat_adverse_events$ni, dat_adverse_events$treatment, dat_adverse_events$study_type, 
-sprintf("%.02f",  dat_adverse_events$qualsyst), 
-paste0(formatC(weights(fit), format="f", digits=1, width=4), "%")),
-xlab="Odds ratio",
-ilab.xpos=c(-3, -2, 2.5, 3, 3.5), 
-cex=cex_plot, ylim=c(-1, y_lim),
-rows=xrows,
-efac =c(.8), #offset=y_offset, 
-mlab=mlabfun("RE Model for All Studies", res_agonistsRCT),
-font=4, header="Author(s) and Year")
+forest(fit_ae, xlim=c(-9, 10), at=log(c(0.25, 1, 4, 20)), atransf=exp,
+		ilab=cbind(dat_aes$ni, dat_aes$treatment, dat_aes$ae2i, dat_aes$ae1i, dat_aes$study_type, 
+		sprintf("%.02f",  dat_aes$qualsyst), 
+		paste0(formatC(weights(fit_ae), format="f", digits=1, width=4), "%")),
+		xlab="Relative risk",
+		ilab.xpos=c(-5.5, -4, -3, -2, 5, 6, 7), 
+		cex=cex_plot, ylim=c(-1, y_lim),
+		rows=xrows,
+		efac =c(.8), #offset=y_offset, 
+		mlab=mlabfun("RE Model for All Studies", res_agonistsRCT),
+		font=4, header="Author(s) and Year")
 
 ### set font expansion factor (as in forest() above) and use a bold font
 op <- par(font=2, mar = c(2, 2, 2, 2))
 
-text((c(-.5, .5)), cex=cex_plot, y_lim, c("Favours placebo", "Favors intervention"), 
 pos=c(2, 4), offset=y_offset)
 
 ### Add column headings for everything defined in "forest::ilab"
-text(c(-3), cex=cex_plot, y_lim, c("n"))
-text(c(2.5), cex=cex_plot, y_lim, c("type"))
-text(c(3), cex=cex_plot, y_lim+2*y_offset, c("QualSyst"))
-text(c(3), cex=cex_plot, y_lim, c("score"))
-text(c(3.5), cex=cex_plot, y_lim, c("weight"))
+text(c(-5.5), cex=cex_plot, y_lim, c("n"))
+text(c(-4), cex=cex_plot, y_lim, c("agent"))
+text(c(-3), cex=cex_plot, y_lim, c("AEctrl"))
+text(c(-2), cex=cex_plot, y_lim, c("AEver"))
+text(c(5), cex=cex_plot, y_lim, c("type"))
+text(c(6), cex=cex_plot, y_lim+2*y_offset, c("QualSyst"))
+text(c(6), cex=cex_plot, y_lim, c("score"))
+text(c(7), cex=cex_plot, y_lim, c("weight"))
 
 ### add text for subgroups
 ### add text for the subgroups
-text(-5, sort(headings, decreasing=TRUE), pos=4, cex=cex_plot*1.5, c(
-   sprintf("Dopamine agonists (n = %s)", sum(dat_adverse_events$ni[dat_adverse_events$category=="dopamine_agonists"])),
-   sprintf("Clozapine (n = %s)", sum(dat_adverse_events$ni[dat_adverse_events$category=="clozapine"])), 
-   sprintf("MAO-inhibitor (n = %s)", sum(dat_adverse_events$ni[dat_adverse_events$category=="mao_inhibitors"])), 
-   sprintf("Budipine (n = %s)", sum(dat_adverse_events$ni[dat_adverse_events$category=="budipine"])),
-   sprintf("Adenosine antagonists (n = %s)", sum(dat_adverse_events$ni[dat_adverse_events$category=="adenosine_antagonist"]))
+text(-9, sort(headings, decreasing=TRUE), pos=4, cex=cex_plot*1.15, c(
+   sprintf("Dopamine agonists (n = %s)", sum(dat_aes$ni[dat_aes$category=="dopamine_agonists"])),
+   sprintf("Clozapine (n = %s)", sum(dat_aes$ni[dat_aes$category=="clozapine"])), 
+   sprintf("MAO-inhibitor (n = %s)", sum(dat_aes$ni[dat_aes$category=="mao_inhibitors"])), 
+   sprintf("Budipine (n = %s)", sum(dat_aes$ni[dat_aes$category=="budipine"])),
+   sprintf("Adenosine antagonists (n = %s)", sum(dat_aes$ni[dat_aes$category=="adenosine_antagonist"]))
 ))
 
 ### set par back to the original settings
 par(op)
 
 ### fit random-effects model in all subgroups
-res.dop <- rma(yi, vi, subset=(category=="dopamine_agonists"), data=dat_adverse_events)
-res.clo <- rma(yi, vi, subset=(category=="clozapine"), data=dat_adverse_events)
-res.mao <- rma(yi, vi, subset=(category=="mao_inhibitors"), data=dat_adverse_events)
-res.bud <- rma(yi, vi, subset=(category=="budipine"), data=dat_adverse_events)
-res.ade <- rma(yi, vi, subset=(category=="adenosine_antagonist"), data=dat_adverse_events)
+res.dop <- rma(yi, vi, subset=(category=="dopamine_agonists"), data=dat_aes)
+res.clo <- rma(yi, vi, subset=(category=="clozapine"), data=dat_aes)
+res.mao <- rma(yi, vi, subset=(category=="mao_inhibitors"), data=dat_aes)
+res.bud <- rma(yi, vi, subset=(category=="budipine"), data=dat_aes)
+res.ade <- rma(yi, vi, subset=(category=="adenosine_antagonist"), data=dat_aes)
 
 yshift = .2
 fac_cex = 1
 ### add summary polygons for the three subgroups
-addpoly(res.ade, row= 1.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.ade), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.bud, row= 6.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.bud), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.mao, row= 11.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.mao), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.clo, row= 25.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.clo), cex=cex_plot*fac_cex, efac = c(.5))
-addpoly(res.dop, row= 30.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.dop), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.ade, atransf=exp, row= 1.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.ade), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.bud, atransf=exp, row= 6.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.bud), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.mao, atransf=exp, row= 11.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.mao), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.clo, atransf=exp, row= 25.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.clo), cex=cex_plot*fac_cex, efac = c(.5))
+addpoly(res.dop, atransf=exp, row= 30.5 + yshift, mlab=mlabfun("RE Model for Subgroup", res.dop), cex=cex_plot*fac_cex, efac = c(.5))
 
 abline(h=0)
 
 ### fit meta-regression model to test for subgroup differences
-dat_adverse_events$category <- as.factor(dat_adverse_events$category)
+dat_aes$category <- as.factor(dat_aes$category)
 groups <- c("adenosine_antagonist", "budipine", "mao_inhibitors", "clozapine", "dopamine_agonists")
-levels(dat_adverse_events) <- groups
-res_overallAE <- rma(yi, vi, mods = ~ category - 1, data=dat_adverse_events)
+levels(dat_aes) <- groups
+res_overallAE <- rma(yi, vi, mods = ~ category - 1, data=dat_aes)
 
 ### add text for the test of subgroup differences
-text(-10, -1.8, pos=4, cex=cex_plot, bquote(paste("Test for Subgroup Differences: ",
+text(-9, -1.8, pos=4, cex=cex_plot, bquote(paste("Test for Subgroup Differences: ",
  "Q[M]", " = ", .(formatC(res_overallAE$QM, digits=2, format="f")), ", df = ", .(res_overallAE$p - 1),
  ", p = ", .(formatC(res_overallAE$QMp, digits=3, format="f")))))
 dev.off()
 
 # Run post-hoc analyses
 # =================
-pwc <- summary(glht(res_overallAE, linfct=cbind(contrMat(rep(1,5), type="Tukey"))), 
-test=adjusted("BH")) # pairwise comparisons
-mat2plot <- matrix(0, nrow = 5, ncol = 5, dimnames=list(toupper(substr(groups, 1, 5)), toupper(substr(groups, 1, 5)))) + + diag(5)/1000000
-mat_significance <- mat2plot 
-mat2plot[lower.tri(mat2plot, diag = FALSE)] <- unname(pwc$test$tstat)
+pwc 				<- summary(glht(res_overallAE, linfct=cbind(contrMat(rep(1,5), type="Tukey"))), 
+						test=adjusted("BH")) # pairwise comparisons
+mat2plot 			<- matrix(0, nrow = 5, ncol = 5, dimnames=list(toupper(substr(groups, 1, 5)), toupper(substr(groups, 1, 5)))) + diag(5)/1000000
+mat_significance 	<- mat2plot 
+mat2plot[lower.tri(mat2plot, diag = FALSE)] 		<- unname(pwc$test$tstat)
 mat_significance[lower.tri(mat2plot, diag = FALSE)] <- unname(pwc$test$pvalues)
-melted_cormat <- melt(mat2plot, na.rm = TRUE) # converts to "long" format
-melted_cormat$pval <- melt(mat_significance, na.rm = TRUE) %>% dplyr::select(value)
-melted_cormat$pval <- melted_cormat$pval$value # dodgy solution
+melted_cormat 		<- melt(mat2plot, na.rm = TRUE) # converts to "long" format
+melted_cormat$pval 	<- melt(mat_significance, na.rm = TRUE) %>% dplyr::select(value)
+melted_cormat$pval 	<- melted_cormat$pval$value # dodgy solution ; )
 colnames(melted_cormat)<-c("Var1", "Var2", "tstat", "pval")
-melted_cormat[melted_cormat==0] <- NA # remove zero values and convert to NA
-melted_cormat$pval[melted_cormat$pval<.05 & melted_cormat$pval>.001] <- "*"
-melted_cormat$pval[melted_cormat$pval<.001] <- "**"
-melted_cormat$pval[melted_cormat$pval>.05] <- NA
+
+melted_cormat[melted_cormat==0] 									<- NA # remove zero values and convert to NA
+melted_cormat$pval[melted_cormat$pval<.05 & melted_cormat$pval>.001]<- "*"
+melted_cormat$pval[melted_cormat$pval<.001] 						<- "**"
+melted_cormat$pval[melted_cormat$pval>.05] 							<- NA
 
 # Create a heatmap for pairwise comparisons
-# svg(filename=file.path(wdir, "results", "heatmaps.maoRCT.v1.0.svg"))
+# svg(filename=file.path(wdir, "results", "heatmaps.aesRCT.v1.0.svg"))
 windowsFonts("Arial" = windowsFont("TT Arial"))
 ggplot(data = melted_cormat %>% drop_na(-pval), aes(Var2, Var1, fill = tstat))+
-geom_tile(color = "white")+
-scale_fill_gradient2(mid="#FBFEF9",low="#0C6291",high="#A63446", limits=c(-5,5),space = "Lab", 
-   name="T-statistics") +
-geom_text(aes(label = pval)) +
-ylab(NULL)  + xlab(NULL) +
-ggtitle("Pairwise comparison between MAO-inhibitors") + 
-theme_minimal() +
-#theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-   #size = 12, hjust = 1), 
-   #axis.text.x=element_blank()) +
-coord_fixed()
+	geom_tile(color = "white")+
+	scale_fill_gradient2(mid="#FBFEF9",low="#0C6291",high="#A63446", limits=c(-5,5),space = "Lab", 
+	   name="T-statistics") +
+	geom_text(aes(label = pval)) +
+	ylab(NULL)  + xlab(NULL) +
+	ggtitle("Pairwise comparison between MAO-inhibitors") + 
+	theme_minimal() +
+	#theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+	   #size = 12, hjust = 1), 
+	   #axis.text.x=element_blank()) +
+	coord_fixed()
 dev.off()
-
 
 # ==================================================================================================
 # ==================================================================================================
@@ -911,37 +914,6 @@ catVars <- c("study_type", "category")
 myVars <- c(catVars, NumVars)
 tableOne <- CreateTableOne(vars = myVars, data = dat_table_one, factorVars = catVars)
 write.csv(print(tableOne), file=file.path(getwd(), "results", "tableOne.v1.0.csv"))
-
-
-# ANOVA for UPDRS
-dat_adverse_events <- read_excel(file.path(wdir, "results_adverse-events.v2.0.xlsx"))
-dat_anova <- dat_adverse_events %>% dplyr::select(slab:study_type, age1, age2, n1i, n2i, updrs1, updrs2) %>% na_if("NA") %>% drop_na(-n2i, -updrs2, -age2)
-
-groups <- data.frame(	levodopa=c("levodopa", rep(NA, 8)), # adds groups to dataframe
-						betablocker=c("propanolol", "zuranolone", "nipradilol", rep(NA, 6)),
-						primidone=c("primidone", rep(NA, 8)),
-						anticholinergics=c("trihexphenidyl", "benztropin", "clozapine", rep(NA,6 )),
-						amantadine=c("amantadine", rep(NA, 8)), 
-						dopamine_agonists=c("ropinirole", "rotigotine", "apomorphine", "pramipexole", 
-						"piribedil", "bromocriptine", "pergolide", "cabergoline", "dihydroergocriptin"), 
-						# clozapine=c("clozapine", rep(NA, 8)), 
-						mao_inhibitors=c("rasagiline", "selegiline", "safinamide", rep(NA, 6)),
-						cannabis=c("cannabis", rep(NA, 8)), 
-						budipine=c("budipine", rep(NA, 8)),
-						zonisamide=c("zonisamide", rep(NA, 8)),
-						adenosine_antagonist=c("theophylline", "caffeine", "adenosineA2a", rep(NA, 6)),
-						botox=c("botulinum", rep(NA, 8))
-					)
-
-dat_anova <- dat_anova %>% mutate(category=NA, age=NA, updrs=NA, class=NA, order_no=NA) # add columns to dataframe to work with
-iter<- 0
-for (k in colnames(groups)){ # assigns category to the different treatments
-	iter <- iter + 1
-	temp <- dat_anova %>% rowid_to_column %>% 
-	filter(if_any(everything(),~str_detect(., c(paste(groups[[k]][!is.na(groups[[k]])],collapse='|'))))) 
-	dat_anova$category[temp$rowid]<- colnames(groups)[iter]
-	dat_anova$order_no[temp$rowid]<- iter
-}
 
 
 # ==================================================================================================
@@ -1008,34 +980,56 @@ icc(
 
 # Load data and extract further information needed (e.g., total age, cumulative updrs between groups, etc.)
 # =================
-dat_anova <- dat_anova %>% mutate_at(c('age1', 'age2', 'n1i', 'n2i', 'updrs1', 'updrs2'), as.numeric) %>% 
-mutate(age = (n1i*age1 + n2i*age2)/(n1i + n2i))
-dat_anova$age<- ifelse(is.na(dat_anova$age), dat_anova$age1, dat_anova$age)
-dat_anova <- dat_anova %>% mutate(updrs = (n1i*updrs1 + n2i*updrs2)/(n1i + n2i))
-dat_anova$updrs<- ifelse(is.na(dat_anova$updrs), dat_anova$updrs1, dat_anova$updrs)
+dat_demographics <- read_excel(file.path(wdir, "results_adverse-events.v2.0.xlsx"))
+dat_demographics <- dat_demographics %>% mutate_at(c('age1', 'age2', 'n1i', 'n2i', 'updrs1', 'updrs2', 'qualsyst'), as.numeric) %>% 
+	mutate(age_collated = (n1i*age1 + n2i*age2)/(n1i + n2i))
+dat_demographics$age_collated <- ifelse(is.na(dat_demographics$age_collated), dat_demographics$age1, dat_table_one$age_collated)
+dat_demographics <- dat_demographics %>% mutate(updrs = (n1i*updrs1 + n2i*updrs2)/(n1i + n2i))
+dat_demographics$updrs<- ifelse(is.na(dat_demographics$updrs), dat_demographics$updrs1, dat_demographics$updrs)
 
-# Run ANOVA for age and for UPDRS
+# Run ANOVA for age and UPDRS (Supplementary Figure 2 in the manuscript)
 # =================
-stat.test.age <- dat_anova %>% anova_test(age ~ category)
-post_hoc.age <- aov(age ~ category, data=dat_anova) %>% tukey_hsd()
-
-stat.test.updrs <- dat_anova %>% anova_test(updrs ~ category)
-post_hoc.updrs <- aov(updrs ~ category, data=dat_anova) %>% tukey_hsd()
-significant_pairs <- post_hoc.updrs[post_hoc.updrs$p.adj.signif!="ns",]
+stat.test.age <- dat_demographics %>% anova_test(age_collated ~ category)
+post_hoc.age <- aov(age_collated ~ category, data=dat_demographics) %>% tukey_hsd()
 
 svg(filename=file.path(wdir, "results", "group_comparisons.v1.0.svg"))
-a <- ggboxplot(dat_anova, x = "category", y = "age") +
+age <- ggboxplot(dat_demographics, x = "category", y = "age_collated") +
 stat_compare_means(method = "anova", label.y = 75)+ 
-xlab("") + ylim(50, 75) +
+xlab("") + ylim(55, 75) +
   theme(axis.ticks.x = element_blank(),
-        axis.text.x = element_blank()) + 
-geom_hline(yintercept = mean(dat_anova$age), linetype = 2)
-  
-b <- ggboxplot(dat_anova, x = "category", y = "updrs") +
-xlab("") + ylim(0, 60) +
-rotate_x_text(angle = 45) +
-stat_compare_means(method = "anova", label.y = 60) + 
-geom_hline(yintercept = mean(dat_anova$updrs), linetype = 2)
+        axis.text.x = element_blank(),
+		panel.grid.major.y = element_blank()) + 
+geom_hline(yintercept = mean(dat_demographics$age_collated, na.rm=TRUE), linetype = 2)
 
-a/b # plot one below the other
+summary(aov(updrs~category, dat_demographics %>% drop_na(updrs)))
+stats_updrs <- aov(updrs~category, dat_demographics %>% 
+	drop_na(updrs)) %>% tukey_hsd() %>%
+	mutate(y.position = c(rep(0, 32), 62, rep(0, 3)))
+LabelsAgents <- c(	'Botulinum toxin', 
+					'Adenosine antagonists',
+					'Zonisamide', 
+					'Budipine', 
+					'Cannabis', 
+					'Gabaergic agents', 
+					'MAO-inhibitors', 
+					'Dopamine agonists', 
+					'Memantine', 
+					'Amantadine', 
+					'Anticholinergics', 
+					'Primidone', 
+					'Beta-blocker', 
+					'Levodopa')
+updrs <- ggboxplot(dat_demographics, x = "category", y = "updrs") +
+xlab("") + ylim(0, 65) +
+rotate_x_text(angle = 45) +
+  stat_pvalue_manual(
+    data = stats_updrs, label = "p.adj.signif",
+    y.position = "y.position", hide.ns = TRUE
+    ) +
+scale_x_discrete(labels= LabelsAgents) + 
+# stat_compare_means(method = "t.test", label.y = 60, aes(label=..p.adj..)) + 
+geom_hline(yintercept = mean(dat_demographics$updrs, na.rm=TRUE), linetype = 2)
+
+grid.arrange(age, updrs, nrow=2)
+# plot one below the other
 dev.off()

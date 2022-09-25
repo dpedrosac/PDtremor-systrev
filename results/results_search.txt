@@ -1,4 +1,4 @@
-Data to work with is current_analysis (backup: ./sources/samsam.enl)
+Data to work with is current_analysis (./included_references.enl)
 
 PSYCInfo 			:		1336
 Embase			:		5823
@@ -22,9 +22,8 @@ excluced after full-text:	217
 	Poster/Abstract	: 	  0
 	other			:	  4
 
-processed:	105  + 1
+processed:	105
 
-=WURZEL(($D$23*(E73+(D73-MITTELWERT(D73;D75))^2)+$D$23*(E75+(D75-MITTELWERT(D73;D75))^2))/($D$23+$D$23))
 
 comments1: cochrane reviews* screened with 189 results:
 
