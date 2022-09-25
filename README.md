@@ -25,16 +25,20 @@ Dr. David Pedrosa MD, PhD
 Senior consultant at the Department of Neurology,
 Head of the Movement Disorders Section, University Hospital Giessen and Marburg 
 
+Dr. Anna Pedrosa M.Sc. Palliative Care,
+Study Group Ethics in Medicine, Philipps-University Marburg, Marburg, Germany
+
 Dr. Josefine Waldthaler MD, PhD
 Consultant at the Department of Neurology,
 Movement Disorders Section, University Hospital Giessen and Marburg 
 
-Dr. Anna Pedrosa M.Sc. Palliative Care,
-Study Group Ethics in Medicine, Philipps-University Marburg, Marburg, Germany
-
 Dr. Felicitas Mügge,
 Resident at the Department of Neurology, 
 Movement Disorders and Neuromodulation, University Hospital Giessen and Marburg
+
+Prof. Lars Timmermann
+Chair of the Department of Neurology, 
+University Hospital Giessen and Marburg
 
 ## Links
 - https://bmjopen.bmj.com/content/11/8/e048367.abstract
